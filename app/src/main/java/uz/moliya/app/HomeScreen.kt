@@ -1,6 +1,12 @@
 package uz.moliya.app
 
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.AccountBalance
+import androidx.compose.material.icons.rounded.Assessment
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,28 +116,19 @@ fun HomeScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 BigButton(
-                    text = "Xarajat",
-                    icon = Icons.Rounded.Remove,
-                    container = Brand.expense,
-                    onClick = { onQuickAdd(false) },
-                    modifier = Modifier.weight(1f),
-                )
-                BigButton(
                     text = "Daromad",
                     icon = Icons.Rounded.Add,
                     container = Brand.income,
                     onClick = { onQuickAdd(true) },
                     modifier = Modifier.weight(1f),
                 )
-            }
-        }
-
-        item { SavingsRateCard(data = data, onClick = onOpenReport) }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlineBigButton(text = "Sof boylik", onClick = onOpenNetWorth, modifier = Modifier.weight(1f))
-                OutlineBigButton(text = "Yillik hisobot", onClick = onOpenYear, modifier = Modifier.weight(1f))
+                BigButton(
+                    text = "Xarajat",
+                    icon = Icons.Rounded.Remove,
+                    container = Brand.expense,
+                    onClick = { onQuickAdd(false) },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
 
@@ -169,29 +166,31 @@ fun HomeScreen(
             }
         }
 
-        item {
-            AppCard {
-                Text(
-                    "Oxirgi 12 oy",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendDot("Daromad", Brand.income)
-                    LegendDot("Xarajat", Brand.expense)
+        if (data.isEmpty) {
+            item {
+                AppCard {
+                    Text(
+                        "Xush kelibsiz!",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Moliya sizning pulingizni oddiy yo'l bilan kuzatishga yordam beradi. Boshlash uchun:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    WelcomeStep("1", "Tepadagi \"Daromad\" tugmasi bilan oyligingizni kiriting")
+                    Spacer(Modifier.height(10.dp))
+                    WelcomeStep("2", "Har bir xarajatni \"Xarajat\" tugmasi bilan yozib boring")
+                    Spacer(Modifier.height(10.dp))
+                    WelcomeStep("3", "Bu yerda oylik natija, grafiklar va tavsiyalarni ko'rasiz")
                 }
-                Spacer(Modifier.height(16.dp))
-                DualBarChart(incomes, expenses, labels)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Oldingi oylarni ko'rish uchun grafikni chapga suring",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
-        }
-
+        } else {
+        item { SectionTitle("Bu oy") }
+        item { SavingsRateCard(data = data, onClick = onOpenReport) }
         item {
             AppCard {
                 Text(
@@ -225,6 +224,25 @@ fun HomeScreen(
             }
         }
 
+        item { SectionTitle("Oxirgi 12 oy") }
+        item {
+            AppCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LegendDot("Daromad", Brand.income)
+                    LegendDot("Xarajat", Brand.expense)
+                }
+                Spacer(Modifier.height(16.dp))
+                DualBarChart(incomes, expenses, labels)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Oldingi oylarni ko'rish uchun grafikni chapga suring",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        item { SectionTitle("Jamg'arma va qarzlar") }
         item {
             Row(
                 Modifier
@@ -235,6 +253,15 @@ fun HomeScreen(
                 CushionMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(2) }
                 DebtMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(3) }
             }
+        }
+        item { SectionTitle("Tahlil") }
+        item {
+            AppCard(padding = 4.dp) {
+                NavRow(Icons.Rounded.Assessment, "Oylik hisobot", "Tejash, byudjet va xulosalar", onOpenReport)
+                NavRow(Icons.Rounded.AccountBalance, "Sof boylik", "Hamyonlar, jamg'arma va qarzlar", onOpenNetWorth)
+                NavRow(Icons.Rounded.CalendarMonth, "Yillik hisobot", "Butun yil bo'yicha natija", onOpenYear)
+            }
+        }
         }
     }
 }
@@ -494,7 +521,7 @@ private fun SavingsRateCard(data: FinanceData, onClick: () -> Unit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    "Jamg'arma darajasi",
+                    "Tejash darajasi",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -505,7 +532,7 @@ private fun SavingsRateCard(data: FinanceData, onClick: () -> Unit) {
                     color = color,
                 )
                 Text(
-                    if (current == null) "Bu oy daromad kiritilmagan" else "Maqsad: 20% va undan yuqori",
+                    if (current == null) "Bu oy daromad kiritilmagan" else "Daromaddan qolgan ulush. Yaxshi daraja: 20%+",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -527,13 +554,6 @@ private fun SavingsRateCard(data: FinanceData, onClick: () -> Unit) {
                 }
             }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Batafsil hisobot →",
-            style = MaterialTheme.typography.labelLarge,
-            color = Brand.primary,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }
 
@@ -543,4 +563,43 @@ fun savingsColor(rate: Float?): Color = when {
     rate >= 0.20f -> Brand.income
     rate >= 0.10f -> Brand.warning
     else -> Brand.expense
+}
+
+
+@Composable
+private fun WelcomeStep(number: String, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(number, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Brand.primary)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun NavRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = Brand.primary, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
