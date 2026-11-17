@@ -130,22 +130,24 @@ object XlsxExporter {
 
     private fun debtSheet(d: FinanceData): Sheet {
         val rows = mutableListOf<List<Any>>(
-            listOf("Kim bilan", "Turi", "Umumiy summa", "To'langan/Qaytarilgan", "Qoldiq", "Foiz (%)", "Muddat"),
+            listOf("Kim bilan", "Turi", "Umumiy summa", "To'langan/Qaytarilgan", "Qoldiq", "Foiz (%)", "Muddat", "Familya", "Telefon"),
         )
         for (debt in d.debts) {
             rows.add(
                 listOf(
-                    debt.name,
+                    debt.fullName,
                     if (debt.isLent) "Berilgan qarz (menga qarzdor)" else "Olingan qarz (men qarzdorman)",
                     debt.total,
                     debt.paid,
                     debt.remaining,
                     debt.interest,
                     if (debt.dueDate > 0L) Dates.iso(debt.dueDate) else "",
+                    debt.surname,
+                    debt.phone,
                 ),
             )
         }
-        return Sheet("Qarzlar", listOf(26, 30, 18, 24, 18, 12, 14), rows)
+        return Sheet("Qarzlar", listOf(26, 30, 18, 24, 18, 12, 14, 20, 18), rows)
     }
 
     private fun paymentSheet(d: FinanceData): Sheet {
@@ -154,7 +156,7 @@ object XlsxExporter {
             for (p in debt.payments.sortedBy { it.date }) {
                 rows.add(
                     listOf(
-                        debt.name,
+                        debt.fullName,
                         if (debt.isLent) "Qaytarildi (menga)" else "To'landi (men)",
                         Dates.iso(p.date),
                         p.amount,

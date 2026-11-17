@@ -2,6 +2,11 @@ package uz.moliya.app
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import android.content.Intent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -199,7 +204,7 @@ fun DebtsScreen(
     if (del != null) {
         ConfirmDialog(
             title = "Qarzni o'chirish",
-            text = "\"${del.name}\" va uning barcha to'lov tarixi o'chiriladi. Davom etasizmi?",
+            text = "\"${del.fullName}\" va uning barcha to'lov tarixi o'chiriladi. Davom etasizmi?",
             confirmLabel = "O'chirish",
             onConfirm = {
                 onDeleteDebt(del)
@@ -248,12 +253,30 @@ private fun DebtCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    debt.name,
+                    debt.fullName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (debt.phone.isNotBlank()) {
+                    val ctx = LocalContext.current
+                    Row(
+                        Modifier
+                            .heightIn(min = 32.dp)
+                            .clickable {
+                                ctx.startActivity(
+                                    Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + debt.phone.filter { it.isDigit() || it == '+' }))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.Call, contentDescription = "Qo'ng'iroq qilish", tint = Brand.primary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(debt.phone, style = MaterialTheme.typography.bodyMedium, color = Brand.primary)
+                    }
+                }
                 Spacer(Modifier.height(6.dp))
                 StatusPill(
                     if (debt.isLent) "Berilgan qarz" else "Olingan qarz",
@@ -375,16 +398,14 @@ private fun DebtCard(
 private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
     var isLent by remember { mutableStateOf(startAsLent) }
     var name by remember { mutableStateOf("") }
+    var surname by remember { mutableStateOf("") }
     var total by remember { mutableStateOf("") }
-    var alreadyPaid by remember { mutableStateOf("") }
-    var interest by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
     var hasDue by remember { mutableStateOf(false) }
     var due by remember { mutableStateOf(Dates.today()) }
 
     val totalValue = parseMoney(total)
-    val paidValue = parseMoney(alreadyPaid)
-    val paidTooMuch = paidValue > totalValue && alreadyPaid.isNotEmpty()
-    val canSave = name.isNotBlank() && totalValue > 0 && !paidTooMuch
+    val canSave = name.isNotBlank() && totalValue > 0
 
     FormSheet(title = "Yangi qarz", onDismiss = onDismiss) {
         SegmentedToggle(
@@ -392,35 +413,40 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
             selected = if (isLent) 1 else 0,
             onSelect = { isLent = it == 1 },
         )
+        // 1. Ism
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it.take(40) },
+            onValueChange = { name = it.take(30) },
             modifier = Modifier.fillMaxWidth(),
-            label = {
-                Text(if (isLent) "Kimga bergansiz? (ism)" else "Kimdan olgansiz? (ism yoki bank)")
-            },
+            label = { Text(if (isLent) "Ismi (kimga bergansiz?)" else "Ismi (kimdan olgansiz?)") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
             shape = RoundedCornerShape(14.dp),
         )
-        MoneyField(value = total, onChange = { total = it }, label = "Qarz summasi")
-        MoneyField(
-            value = alreadyPaid,
-            onChange = { alreadyPaid = it },
-            label = if (isLent) "Allaqachon qaytarilgan (ixtiyoriy)" else "Allaqachon to'langan (ixtiyoriy)",
-            isError = paidTooMuch,
-            errorText = "Umumiy summadan ko'p bo'lmasligi kerak",
-        )
+        // 2. Familya
         OutlinedTextField(
-            value = interest,
-            onValueChange = { raw -> interest = raw.filter { ch -> ch in '0'..'9' || ch == '.' || ch == ',' }.take(6) },
+            value = surname,
+            onValueChange = { surname = it.take(30) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Yillik foiz (ixtiyoriy)") },
-            suffix = { Text("%") },
+            label = { Text("Familyasi") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
             shape = RoundedCornerShape(14.dp),
         )
+        // 3. Qarz summasi
+        MoneyField(value = total, onChange = { total = it }, label = "Qarz summasi")
+        // 4. Telefon raqami
+        OutlinedTextField(
+            value = phone,
+            onValueChange = { raw -> phone = raw.filter { ch -> ch.isDigit() || ch == '+' || ch == ' ' || ch == '-' }.take(18) },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Telefon raqami") },
+            placeholder = { Text("+998 90 123 45 67") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
+            shape = RoundedCornerShape(14.dp),
+        )
+        // 5. Qaytarish muddati
         Row(
             Modifier
                 .fillMaxWidth()
@@ -438,25 +464,23 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
         if (hasDue) {
             DateField(millis = due, onChange = { due = it }, label = "Muddat")
         }
+        // 6. Saqlash
         BigButton(
             text = "Saqlash",
             enabled = canSave,
             modifier = Modifier.fillMaxWidth(),
             onClick = {
-                val payments = if (paidValue > 0) {
-                    listOf(DebtPayment(id = Ids.next(), amount = paidValue, date = Dates.today()))
-                } else {
-                    emptyList()
-                }
                 onSave(
                     Debt(
                         id = Ids.next(),
                         name = name.trim(),
                         total = totalValue,
-                        interest = parseDecimal(interest),
+                        interest = 0.0,
                         dueDate = if (hasDue) due else 0L,
-                        payments = payments,
+                        payments = emptyList(),
                         isLent = isLent,
+                        surname = surname.trim(),
+                        phone = phone.trim(),
                     ),
                 )
                 onDismiss()
@@ -477,7 +501,7 @@ private fun PaymentSheet(debt: Debt, onDismiss: () -> Unit, onSave: (DebtPayment
         onDismiss = onDismiss,
     ) {
         Text(
-            "${debt.name}. Qoldiq: ${formatMoney(debt.remaining)}",
+            "${debt.fullName}. Qoldiq: ${formatMoney(debt.remaining)}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

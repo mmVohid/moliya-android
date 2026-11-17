@@ -53,7 +53,10 @@ data class Debt(
     val payments: List<DebtPayment>,
     /** false = men olgan qarz (men qaytaraman), true = men bergan qarz (menga qaytarishadi) */
     val isLent: Boolean = false,
+    val surname: String = "",
+    val phone: String = "",
 ) {
+    val fullName: String get() = (name + " " + surname).trim()
     val paid: Long get() = payments.sumOf { it.amount }
     val remaining: Long get() = (total - paid).coerceAtLeast(0L)
     val progress: Float
@@ -569,6 +572,8 @@ object Storage {
             val o = JSONObject()
             o.put("id", debt.id)
             o.put("name", debt.name)
+            o.put("surname", debt.surname)
+            o.put("phone", debt.phone)
             o.put("total", debt.total)
             o.put("interest", debt.interest)
             o.put("dueDate", debt.dueDate)
@@ -625,6 +630,8 @@ object Storage {
             Debt(
                 id = d.getLong("id"),
                 name = d.optString("name", ""),
+                surname = d.optString("surname", ""),
+                phone = d.optString("phone", ""),
                 total = d.getLong("total"),
                 interest = d.optDouble("interest", 0.0),
                 dueDate = d.optLong("dueDate", 0L),

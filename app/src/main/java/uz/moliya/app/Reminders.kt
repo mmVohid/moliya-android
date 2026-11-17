@@ -73,8 +73,8 @@ object Reminders {
             }
             val amount = formatMoney(debt.remaining)
             out.add(
-                if (debt.isLent) "${debt.name} sizga $amount qaytarishi kerak: $whenText"
-                else "${debt.name} qarzi ($amount): $whenText",
+                if (debt.isLent) "${debt.fullName} sizga $amount qaytarishi kerak: $whenText"
+                else "${debt.fullName} qarzi ($amount): $whenText",
             )
         }
         return out

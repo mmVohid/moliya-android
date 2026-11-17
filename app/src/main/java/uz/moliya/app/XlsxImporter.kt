@@ -99,7 +99,8 @@ object XlsxImporter {
 
         val debts = ArrayList<Debt>()
         for (r in sheets["Qarzlar"].dataRows()) {
-            val name = r.col(0)
+            val surname = r.col(7)
+            val name = r.col(0).let { if (surname.isNotEmpty() && it.endsWith(" $surname")) it.removeSuffix(" $surname").trim() else it }
             val total = num(r.col(2))
             if (name.isEmpty() || total <= 0L) continue
             val dueText = r.col(6)
@@ -107,6 +108,8 @@ object XlsxImporter {
                 Debt(
                     id = Ids.next(),
                     name = name,
+                    surname = surname,
+                    phone = r.col(8),
                     total = total,
                     interest = r.col(5).replace(',', '.').toDoubleOrNull() ?: 0.0,
                     dueDate = if (dueText.isEmpty()) 0L else date(dueText),
@@ -120,7 +123,7 @@ object XlsxImporter {
             val amount = num(r.col(3))
             if (name.isEmpty() || amount <= 0L) continue
             val lent = r.col(1).startsWith("Qaytarildi", ignoreCase = true)
-            val index = debts.indexOfFirst { it.name == name && it.isLent == lent }
+            val index = debts.indexOfFirst { it.fullName == name && it.isLent == lent }
             if (index < 0) continue
             val debt = debts[index]
             debts[index] = debt.copy(
