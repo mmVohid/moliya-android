@@ -1,5 +1,7 @@
 package uz.moliya.app
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.LaunchedEffect
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -47,34 +49,7 @@ import androidx.core.content.ContextCompat
 
 private data class SetupStep(val icon: ImageVector, val title: String, val text: String, val action: String)
 
-private val steps = listOf(
-    SetupStep(
-        Icons.Rounded.Notifications,
-        "Eslatmalarni yoqamizmi?",
-        "Qarz muddati yaqinlashganda bildirishnoma yuboramiz, shunda hech narsani unutmaysiz.",
-        "Ha, yoqish",
-    ),
-    SetupStep(
-        Icons.Rounded.Security,
-        "Ekranni himoyalaymizmi?",
-        "Skrinshot olish va \"oxirgi ilovalar\" ro'yxatida summalar ko'rinishi bloklanadi.",
-        "Ha, himoyalash",
-    ),
-    SetupStep(
-        Icons.Rounded.Lock,
-        "PIN-kod o'rnatamizmi?",
-        "Ilovani 4 xonali PIN bilan qulflang. Telefoningiz qo'lga tushsa ham ma'lumotlar xavfsiz bo'ladi.",
-        "Ha, PIN o'rnatish",
-    ),
-    SetupStep(
-        Icons.Rounded.CloudUpload,
-        "Avtomatik zaxira kerakmi?",
-        "Papka tanlang. Har hafta Excel nusxa o'sha yerga o'zi saqlanadi, ma'lumot yo'qolmaydi.",
-        "Ha, papka tanlash",
-    ),
-)
-
-/** Birinchi ochilishdagi ixtiyoriy takliflar. Har bir qadamni "Hozir emas" bilan o'tkazib yuborish mumkin. */
+/** Birinchi ochilish: ortiqcha ekranlarsiz, ketma-ket faqat ruxsat/taklif oynalari. Hammasini Sozlamalardan o'zgartirish mumkin. */
 @Composable
 fun SetupScreen(
     settings: AppSettings,
@@ -92,7 +67,7 @@ fun SetupScreen(
     var showPin by remember { mutableStateOf(false) }
 
     fun next() {
-        if (index >= steps.lastIndex) onFinish() else index += 1
+        if (index >= 3) onFinish() else index += 1
     }
 
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -109,113 +84,46 @@ fun SetupScreen(
                 onPickFolder(uri.toString())
                 onAutoBackup(true)
             } catch (e: SecurityException) {
-                // ruxsat olinmadi, o'tkazib yuboramiz
+                // ruxsat olinmadi
             }
         }
         next()
     }
 
-    val step = steps[index]
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(24.dp),
-    ) {
-        Column(
-            Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Sozlash ${index + 1}/${steps.size}",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                TextButton(onClick = onFinish, modifier = Modifier.heightIn(min = 48.dp)) { Text("O'tkazib yuborish") }
+    // Tizim oynalari (bildirishnoma, papka) darhol; qolganlari qisqa ha/yo'q oynasi
+    LaunchedEffect(index) {
+        when (index) {
+            0 -> if (android.os.Build.VERSION.SDK_INT >= 33) {
+                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                onReminders(true)
+                next()
             }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
-                    Modifier
-                        .size(96.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(step.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(46.dp))
-                }
-                Spacer(Modifier.height(28.dp))
-                Text(
-                    step.title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    step.text,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    steps.indices.forEach { i ->
-                        Box(
-                            Modifier
-                                .size(if (i == index) 10.dp else 8.dp)
-                                .clip(CircleShape)
-                                .background(if (i == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
-                        )
-                    }
-                }
-            }
-
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                BigButton(
-                    text = step.action,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        when (index) {
-                            0 -> {
-                                if (Build.VERSION.SDK_INT >= 33 &&
-                                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                                    PackageManager.PERMISSION_GRANTED
-                                ) {
-                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else {
-                                    onReminders(true)
-                                    next()
-                                }
-                            }
-                            1 -> {
-                                onSecureScreen(true)
-                                next()
-                            }
-                            2 -> if (settings.hasPin) next() else showPin = true
-                            else -> folderLauncher.launch(null)
-                        }
-                    },
-                )
-                Spacer(Modifier.height(4.dp))
-                TextButton(onClick = { next() }, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text("Hozir emas", fontWeight = FontWeight.SemiBold)
-                }
-                Text(
-                    "Hammasini keyinroq Sozlamalardan o'zgartirish mumkin.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-            }
+            3 -> folderLauncher.launch(null)
         }
     }
 
-    if (showPin) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+
+    if (index == 1) {
+        AlertDialog(
+            onDismissRequest = { next() },
+            title = { Text("Ekranni himoyalaymizmi?") },
+            text = { Text("Skrinshot olish va oxirgi ilovalarda summalar ko'rinishi bloklanadi.") },
+            confirmButton = { TextButton(onClick = { onSecureScreen(true); next() }) { Text("Ha") } },
+            dismissButton = { TextButton(onClick = { next() }) { Text("Hozir emas") } },
+        )
+    }
+    if (index == 2 && !showPin) {
+        AlertDialog(
+            onDismissRequest = { next() },
+            title = { Text("PIN-kod o'rnatamizmi?") },
+            text = { Text("Ilovani 4 xonali PIN bilan qulflaysiz.") },
+            confirmButton = { TextButton(onClick = { showPin = true }) { Text("Ha") } },
+            dismissButton = { TextButton(onClick = { next() }) { Text("Hozir emas") } },
+        )
+    }
+    if (index == 2 && showPin) {
         PinFlowSheet(
             mode = PinMode.SET,
             verify = verifyPin,
@@ -225,7 +133,10 @@ fun SetupScreen(
                 next()
             },
             onRemove = onClearPin,
-            onDismiss = { showPin = false },
+            onDismiss = {
+                showPin = false
+                next()
+            },
         )
     }
 }

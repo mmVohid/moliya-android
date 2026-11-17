@@ -179,27 +179,6 @@ fun HomeScreen(
         }
 
         if (data.isEmpty) {
-            item {
-                AppCard {
-                    Text(
-                        "Xush kelibsiz!",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Moliya sizning pulingizni oddiy yo'l bilan kuzatishga yordam beradi. Boshlash uchun:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    WelcomeStep("1", "Tepadagi \"Daromad\" tugmasi bilan oyligingizni kiriting")
-                    Spacer(Modifier.height(10.dp))
-                    WelcomeStep("2", "Har bir xarajatni \"Xarajat\" tugmasi bilan yozib boring")
-                    Spacer(Modifier.height(10.dp))
-                    WelcomeStep("3", "Bu yerda oylik natija, grafiklar va tavsiyalarni ko'rasiz")
-                }
-            }
         } else {
         if (cards and 6 != 0) item { SectionTitle("Bu oy") }
         if (cards and 4 != 0) item { SavingsRateCard(data = data, onClick = onOpenReport) }
