@@ -2,6 +2,7 @@
 
 package uz.moliya.app
 
+import androidx.compose.material.icons.rounded.Share
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.runtime.LaunchedEffect
@@ -135,7 +136,18 @@ internal fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Str
 
         item { GroupLabel("Boshqa") }
         item {
+            val context = LocalContext.current
             AppCard(padding = 0.dp) {
+                NavRow(Icons.Rounded.Share, Color(0xFF2E7D6B), "Do'stga ulashish", "") {
+                    val text = "Moliya: shaxsiy moliyani kuzatish ilovasi. Ma'lumotlar faqat telefoningizda saqlanadi.\n" +
+                        "Yuklab olish: https://github.com/mmVohid/moliya-android/releases/tag/latest"
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                    context.startActivity(Intent.createChooser(send, "Moliya'ni ulashish").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                Divider()
                 NavRow(Icons.Rounded.Info, Color(0xFF6B7280), "Ilova haqida", "v${BuildConfig.VERSION_NAME}") { onOpen("about") }
             }
         }
