@@ -2,6 +2,8 @@
 
 package uz.moliya.app
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import kotlinx.coroutines.delay
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -189,13 +191,28 @@ fun CashFlowScreen(
                             todayMs - 24L * 60 * 60 * 1000 -> "Kecha"
                             else -> Dates.format(day)
                         }
-                        Text(
-                            label,
-                            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        val dayExpense = list.filter { !it.isIncome }.sumOf { it.amount }
+                        val dayIncome = list.filter { it.isIncome }.sumOf { it.amount }
+                        Row(Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                label,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (!data.hideBalance) {
+                                Text(
+                                    buildString {
+                                        if (dayIncome > 0L) append("+").append(formatMoney(dayIncome))
+                                        if (dayIncome > 0L && dayExpense > 0L) append("   ")
+                                        if (dayExpense > 0L) append("−").append(formatMoney(dayExpense))
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                     items(list, key = { it.id }) { txn ->
                         TxnRow(
@@ -451,8 +468,51 @@ private fun TxnSheet(
         // 1. Summa
         MoneyField(value = amount, onChange = { amount = it }, label = "Summa", focusRequester = amountFocus)
 
+        // Tez summa: bosilganda qo'shiladi
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(10_000L, 50_000L, 100_000L, 500_000L).forEach { step ->
+                FilterChip(
+                    selected = false,
+                    onClick = { amount = (amountUzs + step).toString() },
+                    label = { Text("+" + formatMoney(step).removeSuffix(" so'm")) },
+                    modifier = Modifier.heightIn(min = 40.dp),
+                )
+            }
+            if (amountUzs > 0L) {
+                FilterChip(
+                    selected = false,
+                    onClick = { amount = "" },
+                    label = { Text("Tozalash") },
+                    modifier = Modifier.heightIn(min = 40.dp),
+                )
+            }
+        }
+
         // 2. Izoh (ixtiyoriy)
         NoteField(value = note, onChange = { note = it })
+        val recentNotes = remember(data.txns, isIncome) {
+            data.txns.filter { it.isIncome == isIncome && it.note.isNotBlank() }
+                .groupingBy { it.note }.eachCount()
+                .entries.sortedByDescending { it.value }.take(5).map { it.key }
+        }
+        if (recentNotes.isNotEmpty() && note.isBlank()) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                recentNotes.forEach { n ->
+                    FilterChip(
+                        selected = false,
+                        onClick = { note = n },
+                        label = { Text(n, maxLines = 1) },
+                        modifier = Modifier.heightIn(min = 40.dp),
+                    )
+                }
+            }
+        }
 
         // 3. Sana
         DateField(millis = date, onChange = { date = it })
