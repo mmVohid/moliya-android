@@ -225,7 +225,7 @@ object Categories {
         "Ta'lim", "Do'konlar", "Transport", "Mobile aloqa",
         "Restoran va kofelar", "Kommunal xizmatlar", "Sayohat va mehmonxona", "Boshqalar",
     )
-    val income = listOf("Oylik", "Qo'shimcha daromad", "Sovg'a", "Boshqa")
+    val income = listOf("Avans", "Oylik", "Hadiya", "Qo'shimcha daromad", "Boshqa")
 }
 
 object Ids {
