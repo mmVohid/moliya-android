@@ -88,8 +88,6 @@ fun SettingsScreen(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () ->
     when (page) {
         "security" -> SecurityPage(vm, back)
         "notif" -> NotificationsPage(vm, back)
-        "widgets" -> WidgetsPage(vm, back)
-        "period" -> PeriodPage(vm, back)
         "look" -> LookPage(vm, back)
         "data" -> DataPage(vm, onOpenBackup, back)
         "about" -> AboutPage(back)
@@ -202,7 +200,6 @@ private fun Divider() {
 @Composable
 private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val s = vm.settings
-    val widgetCount = listOf(1, 4, 8, 16).count { s.homeCards and it != 0 }
     val notifCount = listOf(s.reminders, s.dailyReminder).count { it }
     val securityStatus = buildList {
         if (s.hasPin) add("PIN")
@@ -218,13 +215,9 @@ private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Stri
         item { GroupLabel("Asosiy") }
         item {
             AppCard(padding = 0.dp) {
-                NavRow(Icons.Rounded.Widgets, Color(0xFF2E7D6B), "Vidjetlar", "$widgetCount/4") { onOpen("widgets") }
-                Divider()
                 NavRow(Icons.Rounded.Palette, Color(0xFF7B5EA7), "Ko'rinish", listOf("Tizim", "Yorug'", "Qorong'i")[s.theme.coerceIn(0, 2)]) { onOpen("look") }
                 Divider()
                 NavRow(Icons.Rounded.Notifications, Color(0xFFE57C23), "Bildirishnomalar", if (notifCount == 0) "O'chiq" else "$notifCount ta yoqilgan") { onOpen("notif") }
-                Divider()
-                NavRow(Icons.Rounded.CalendarMonth, Color(0xFF0E9AA7), "Hisob oyi", "${s.monthStartDay}-sana") { onOpen("period") }
             }
         }
 
@@ -246,44 +239,6 @@ private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Stri
     }
 }
 
-// ───────────────────────── Vidjetlar ─────────────────────────
-
-@Composable
-private fun WidgetsPage(vm: FinanceViewModel, onBack: () -> Unit) {
-    val s = vm.settings
-    val cardNames = listOf(
-        1 to "Oxirgi 12 oy grafigi",
-        4 to "Jamg'arma darajasi",
-        8 to "Jamg'arma va qarzlar",
-        16 to "Tahlil ro'yxati",
-    )
-    Page("Vidjetlar", onBack) {
-        item {
-            AppCard {
-                Text("Bosh sahifa kartalari", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Hint("Bosh sahifada qaysi kartalar ko'rinishini tanlang.")
-                Spacer(Modifier.height(8.dp))
-                cardNames.forEach { (bit, name) ->
-                    SwitchRow(
-                        title = name,
-                        subtitle = "",
-                        checked = s.homeCards and bit != 0,
-                        onChange = { on -> vm.setHomeCards(if (on) s.homeCards or bit else s.homeCards and bit.inv()) },
-                    )
-                }
-            }
-        }
-        item {
-            AppCard {
-                Text("Telefon ekranidagi vidjet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Hint("Bosh ekranning bo'sh joyini uzoq bosing, \"Vidjetlar\" ni tanlang va \"Moliya\" ni qo'shing. Undan ilovani ochmasdan daromad yoki xarajat yozish mumkin.")
-            }
-        }
-    }
-}
-
 // ───────────────────────── Xavfsizlik ─────────────────────────
 
 @Composable
@@ -292,6 +247,7 @@ private fun SecurityPage(vm: FinanceViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val biometricAvailable = remember { Biometrics.available(context) }
     var pinMode by remember { mutableStateOf<PinMode?>(null) }
+    var setPassword by remember { mutableStateOf(false) }
     val delays = listOf(0, 15, 60, 300)
 
     Page("Xavfsizlik va maxfiylik", onBack) {
@@ -348,10 +304,30 @@ private fun SecurityPage(vm: FinanceViewModel, onBack: () -> Unit) {
                     title = "Ma'lumotlarni shifrlash (AES-256)",
                     subtitle = "Ma'lumot fayli telefon kaliti (Android Keystore) bilan shifrlanadi. Kalit telefondan chiqmaydi.",
                     checked = s.encryptData,
-                    onChange = vm::setEncryption,
+                    onChange = { on ->
+                        vm.setEncryption(on)
+                        android.widget.Toast.makeText(context, if (on) "Ma'lumot shifrlandi (AES-256)" else "Shifrlash o'chirildi", android.widget.Toast.LENGTH_SHORT).show()
+                    },
                 )
                 Spacer(Modifier.height(4.dp))
                 Hint("Excel zaxira va chek rasmlari shifrlanmaydi. Ilovani o'chirib qayta o'rnatsangiz, shifrlangan ma'lumotni tiklab bo'lmaydi, shuning uchun Excel nusxa oling.")
+            }
+        }
+        item {
+            AppCard {
+                SwitchRow(
+                    title = "Zaxirani parol bilan himoyalash",
+                    subtitle = "Excel zaxira AES-256 bilan shifrlanadi. Fayl faqat Moliya'da, parol bilan tiklanadi.",
+                    checked = s.backupEncrypted,
+                    onChange = { on ->
+                        if (on) setPassword = true else {
+                            vm.setBackupPassword(null)
+                            android.widget.Toast.makeText(context, "Zaxira paroli o'chirildi", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                )
+                Spacer(Modifier.height(4.dp))
+                Hint("Parolni unutsangiz, zaxirani tiklab bo'lmaydi. Shifrlangan fayl Excelda ochilmaydi. \"Claude'ga yuborish\" shifrlanmagan nusxa yuboradi.")
             }
         }
         if (s.hasPin) {
@@ -378,13 +354,59 @@ private fun SecurityPage(vm: FinanceViewModel, onBack: () -> Unit) {
         }
     }
 
+    if (setPassword) {
+        var p1 by remember { mutableStateOf("") }
+        var p2 by remember { mutableStateOf("") }
+        val valid = p1.length >= 6 && p1 == p2
+        AlertDialog(
+            onDismissRequest = { setPassword = false },
+            title = { Text("Zaxira paroli") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = p1,
+                        onValueChange = { p1 = it },
+                        label = { Text("Parol (kamida 6 belgi)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    OutlinedTextField(
+                        value = p2,
+                        onValueChange = { p2 = it },
+                        label = { Text("Parolni takrorlang") },
+                        singleLine = true,
+                        isError = p2.isNotEmpty() && p1 != p2,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    Hint("Parolni xavfsiz joyda saqlang. Uni tiklab bo'lmaydi.")
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = valid, onClick = {
+                    vm.setBackupPassword(p1)
+                    setPassword = false
+                    android.widget.Toast.makeText(context, "Zaxira paroli o'rnatildi", android.widget.Toast.LENGTH_SHORT).show()
+                }) { Text("Yoqish") }
+            },
+            dismissButton = { TextButton(onClick = { setPassword = false }) { Text("Bekor qilish") } },
+        )
+    }
+
     val mode = pinMode
     if (mode != null) {
         PinFlowSheet(
             mode = mode,
             verify = vm::verifyPin,
-            onSet = vm::setPin,
-            onRemove = vm::clearPin,
+            onSet = {
+                vm.setPin(it)
+                android.widget.Toast.makeText(context, "PIN-kod o'rnatildi", android.widget.Toast.LENGTH_SHORT).show()
+            },
+            onRemove = {
+                vm.clearPin()
+                android.widget.Toast.makeText(context, "PIN-kod o'chirildi", android.widget.Toast.LENGTH_SHORT).show()
+            },
             onDismiss = { pinMode = null },
         )
     }
@@ -523,20 +545,11 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
                 )
             }
         }
-    }
-}
-
-// ───────────────────────── Hisob oyi ─────────────────────────
-
-@Composable
-private fun PeriodPage(vm: FinanceViewModel, onBack: () -> Unit) {
-    val s = vm.settings
-    Page("Hisob oyi", onBack) {
         item {
             AppCard {
-                Text("Boshlanish kuni", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Hisob oyi boshlanish kuni", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(4.dp))
-                Hint("Oylik 25-sanada tushsa, 25 deb qo'ying: oy balansi va hisobotlar 25 dan keyingi oyning 24 igacha hisoblanadi.")
+                Hint("Oylik 25-sanada tushsa, 25 deb qo'ying: oy balansi va hisobotlar 25 dan keyingi oyning 24 igacha hisoblanadi. Oddiy holatda 1 qoldiring.")
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     IconButton(onClick = { vm.setMonthStartDay(s.monthStartDay - 1) }, enabled = s.monthStartDay > 1, modifier = Modifier.size(48.dp)) {
@@ -553,7 +566,6 @@ private fun PeriodPage(vm: FinanceViewModel, onBack: () -> Unit) {
                         Icon(Icons.Rounded.Add, contentDescription = "Oshirish")
                     }
                 }
-                Spacer(Modifier.height(4.dp))
                 Text(
                     "Joriy davr: " + Dates.monthLabel(0),
                     modifier = Modifier.fillMaxWidth(),
@@ -575,7 +587,6 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
     var confirmWipe by remember { mutableStateOf(false) }
     var typeWipe by remember { mutableStateOf(false) }
     var advanced by rememberSaveable { mutableStateOf(false) }
-    var setPassword by remember { mutableStateOf(false) }
     val keeps = listOf(2, 4, 8, 12)
     val weekdays = listOf(0 to "Avto", 2 to "Du", 3 to "Se", 4 to "Ch", 5 to "Pa", 6 to "Ju", 7 to "Sh", 1 to "Ya")
     val data = vm.data
@@ -616,8 +627,10 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                         if (s.lastAutoBackup > 0L) ". Oxirgisi: ${Dates.formatDateTime(s.lastAutoBackup)}" else "",
                     checked = s.autoBackup,
                     onChange = { on ->
-                        if (!on) vm.setAutoBackup(false)
-                        else if (s.backupFolder.isEmpty()) folderLauncher.launch(null)
+                        if (!on) {
+                            vm.setAutoBackup(false)
+                            android.widget.Toast.makeText(context, "Avto-zaxira o'chirildi", android.widget.Toast.LENGTH_SHORT).show()
+                        } else if (s.backupFolder.isEmpty()) folderLauncher.launch(null)
                         else vm.setAutoBackup(true)
                     },
                 )
@@ -666,18 +679,6 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
             }
         }
         item {
-            AppCard {
-                SwitchRow(
-                    title = "Zaxirani parol bilan himoyalash",
-                    subtitle = "Excel zaxira AES-256 bilan shifrlanadi. Fayl faqat Moliya'da, parol bilan tiklanadi.",
-                    checked = s.backupEncrypted,
-                    onChange = { on -> if (on) setPassword = true else vm.setBackupPassword(null) },
-                )
-                Spacer(Modifier.height(4.dp))
-                Hint("Parolni unutsangiz, zaxirani tiklab bo'lmaydi. Shifrlangan fayl Excelda ochilmaydi. \"Claude'ga yuborish\" shifrlanmagan nusxa yuboradi.")
-            }
-        }
-        item {
             BigButton(text = "Excel: yuklab olish va tiklash", onClick = onOpenBackup, modifier = Modifier.fillMaxWidth())
         }
         item {
@@ -695,45 +696,6 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                 )
             }
         }
-    }
-
-    if (setPassword) {
-        var p1 by remember { mutableStateOf("") }
-        var p2 by remember { mutableStateOf("") }
-        val valid = p1.length >= 6 && p1 == p2
-        AlertDialog(
-            onDismissRequest = { setPassword = false },
-            title = { Text("Zaxira paroli") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = p1,
-                        onValueChange = { p1 = it },
-                        label = { Text("Parol (kamida 6 belgi)") },
-                        singleLine = true,
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    OutlinedTextField(
-                        value = p2,
-                        onValueChange = { p2 = it },
-                        label = { Text("Parolni takrorlang") },
-                        singleLine = true,
-                        isError = p2.isNotEmpty() && p1 != p2,
-                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                    Hint("Parolni xavfsiz joyda saqlang. Uni tiklab bo'lmaydi.")
-                }
-            },
-            confirmButton = {
-                TextButton(enabled = valid, onClick = {
-                    vm.setBackupPassword(p1)
-                    setPassword = false
-                }) { Text("Yoqish") }
-            },
-            dismissButton = { TextButton(onClick = { setPassword = false }) { Text("Bekor qilish") } },
-        )
     }
 
     if (confirmWipe) {
@@ -799,75 +761,34 @@ private fun AboutPage(onBack: () -> Unit) {
     Page("Ilova haqida", onBack) {
         item {
             AppCard {
-                Text("Moliya", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text(
-                    "Versiya ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA.take(7)})",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Ma'lumotlaringiz faqat shu telefonda saqlanadi. Hech qayerga yuborilmaydi.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-        item {
-            AppCard {
-                Text("Cheklovlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                Hint("• PIN-kod ilovani qulflaydi. Ma'lumotni shifrlash alohida yoqiladi (AES-256).")
-                Hint("• Excel zaxira fayllari himoyasiz. Ularni xavfsiz joyda saqlang.")
-                Hint("• PIN esdan chiqsa, tiklab bo'lmaydi.")
-                Hint("• Chek rasmlari telefonda qoladi va Excelga kirmaydi.")
-            }
-        }
-        item {
-            AppCard {
-                Text("Yangilanish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Hint("Internet faqat siz tugmani bosganingizda ishlatiladi. Hech qanday ma'lumot yuborilmaydi.")
-                Spacer(Modifier.height(12.dp))
-                BigButton(
-                    text = if (checking) "Tekshirilmoqda..." else "Yangilanishni tekshirish",
-                    enabled = !checking,
-                    onClick = {
-                        checking = true
-                        scope.launch {
-                            result = UpdateChecker.check()
-                            checking = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                when (val r = result) {
-                    is UpdateResult.Latest -> {
-                        Spacer(Modifier.height(12.dp))
-                        Text("Sizda eng so'nggi versiya o'rnatilgan.", color = Brand.income, fontWeight = FontWeight.SemiBold)
-                    }
-                    is UpdateResult.Available -> {
-                        Spacer(Modifier.height(12.dp))
-                        Text("Yangi versiya bor!", color = Brand.income, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        OutlineBigButton(
-                            text = "Yuklab olish",
-                            onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(r.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Hint("Yuklangan faylni oching va \"Yangilash\" ni tanlang. Ma'lumotlaringiz saqlanadi.")
-                    }
-                    is UpdateResult.Failed -> {
-                        Spacer(Modifier.height(12.dp))
-                        Text("Tekshirib bo'lmadi: ${r.message}", color = Brand.expense)
-                    }
-                    null -> {}
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Moliya", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(
+                        "v${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_SHA.take(7)})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Ma'lumotlaringiz faqat shu telefonda saqlanadi va hech qayerga yuborilmaydi. " +
+                        "PIN ilovani qulflaydi, ma'lumotni shifrlash alohida yoqiladi. " +
+                        "Excel zaxira va chek rasmlari parolsiz himoyasiz, ularni xavfsiz joyda saqlang. " +
+                        "PIN yoki parol esdan chiqsa, tiklab bo'lmaydi.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
         }
         item {
             AppCard(padding = 0.dp) {
                 NavRow(Icons.Rounded.Info, Color(0xFF2E7D6B), "Qisqa qo'llanma", "") { showHelp = true }
+                Divider()
+                NavRow(Icons.Rounded.Edit, Color(0xFFE57C23), "Muammo haqida yozish", "") {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mmVohid/moliya-android/issues/new"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
                 Divider()
                 NavRow(Icons.Rounded.Code, Color(0xFF24292F), "Manba kodini ko'rish", "GitHub") {
                     context.startActivity(
@@ -875,11 +796,46 @@ private fun AboutPage(onBack: () -> Unit) {
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                     )
                 }
-                Divider()
-                NavRow(Icons.Rounded.Edit, Color(0xFFE57C23), "Muammo haqida yozish", "") {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mmVohid/moliya-android/issues/new"))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            }
+        }
+        item {
+            AppCard {
+                Text("Yangilanish", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    when (val r = result) {
+                        is UpdateResult.Latest -> "Sizda eng so'nggi versiya o'rnatilgan."
+                        is UpdateResult.Available -> "Yangi versiya chiqqan. Yuklab oling, fayl ochilgach \"Yangilash\" ni bosing. Ma'lumotlaringiz saqlanadi."
+                        is UpdateResult.Failed -> "Tekshirib bo'lmadi: ${r.message}"
+                        null -> "Internet faqat tugmani bosganingizda ishlatiladi. Hech qanday ma'lumot yuborilmaydi."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when (result) {
+                        is UpdateResult.Latest, is UpdateResult.Available -> Brand.income
+                        is UpdateResult.Failed -> Brand.expense
+                        null -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+                Spacer(Modifier.height(12.dp))
+                val available = result as? UpdateResult.Available
+                if (available != null) {
+                    BigButton(
+                        text = "Yangi versiyani yuklab olish",
+                        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(available.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    BigButton(
+                        text = if (checking) "Tekshirilmoqda..." else if (result is UpdateResult.Failed) "Qayta urinish" else "Yangilanishni tekshirish",
+                        enabled = !checking,
+                        onClick = {
+                            checking = true
+                            scope.launch {
+                                result = UpdateChecker.check()
+                                checking = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
             }
@@ -894,10 +850,10 @@ private fun AboutPage(onBack: () -> Unit) {
                 Text(
                     "1. Bosh sahifadagi \"Daromad\" va \"Xarajat\" tugmalari bilan yozuv kiriting. Faqat summa majburiy.\n\n" +
                         "2. Pul oqimida yozuvni bossangiz tahrirlanadi. O'chirsangiz, \"Qaytarish\" chiqadi.\n\n" +
-                        "3. Limit tugmasi bilan kategoriya bo'yicha oylik chegara qo'ying.\n\n" +
-                        "4. Qarzlar bo'limida olgan va bergan qarzlaringizni kuzating.\n\n" +
-                        "5. Jamg'arma bo'limida himoya yostig'i va shaxsiy maqsadlar bor.\n\n" +
-                        "6. Backup bo'limidan Excel oling. \"Claude'ga yuborish\" tugmasi tahlil va maslahat olishga tayyorlaydi.",
+                        "3. \"Oylik limit\" tugmasi bilan bir oyda jami qancha sarflashni belgilang.\n\n" +
+                        "4. Qarzlar bo'limida olgan va bergan qarzlaringizni, muddatlarini kuzating.\n\n" +
+                        "5. Jamg'armada himoya yostig'i va shaxsiy maqsadlar bor.\n\n" +
+                        "6. Backup bo'limidan Excel oling. Sozlamalarda avto-zaxira va parol bilan himoya yoqiladi.",
                 )
             },
             confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Tushunarli") } },

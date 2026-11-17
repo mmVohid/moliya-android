@@ -295,7 +295,7 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onOpenSettings = { showSettings = true },
                         lastBackupAt = vm.lastBackupAt,
                     userName = vm.settings.userName,
-                    cards = vm.settings.homeCards,
+                    cards = 31,
                     backupReminder = vm.settings.backupReminder,
                         autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
                         firstEntryAt = vm.settings.firstEntryAt,
