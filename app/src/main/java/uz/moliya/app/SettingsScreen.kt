@@ -2,6 +2,7 @@
 
 package uz.moliya.app
 
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Widgets
 import android.Manifest
@@ -88,6 +89,7 @@ fun SettingsScreen(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () ->
         "security" -> SecurityPage(vm, back)
         "notif" -> NotificationsPage(vm, back)
         "widgets" -> WidgetsPage(vm, back)
+        "period" -> PeriodPage(vm, back)
         "look" -> LookPage(vm, back)
         "data" -> DataPage(vm, onOpenBackup, back)
         "about" -> AboutPage(back)
@@ -201,7 +203,7 @@ private fun Divider() {
 private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val s = vm.settings
     val widgetCount = listOf(1, 4, 8, 16).count { s.homeCards and it != 0 }
-    val notifCount = listOf(s.reminders, s.dailyReminder, s.backupReminder).count { it }
+    val notifCount = listOf(s.reminders, s.dailyReminder).count { it }
     val securityStatus = buildList {
         if (s.hasPin) add("PIN")
         if (s.encryptData) add("AES-256")
@@ -221,6 +223,8 @@ private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Stri
                 NavRow(Icons.Rounded.Palette, Color(0xFF7B5EA7), "Ko'rinish", listOf("Tizim", "Yorug'", "Qorong'i")[s.theme.coerceIn(0, 2)]) { onOpen("look") }
                 Divider()
                 NavRow(Icons.Rounded.Notifications, Color(0xFFE57C23), "Bildirishnomalar", if (notifCount == 0) "O'chiq" else "$notifCount ta yoqilgan") { onOpen("notif") }
+                Divider()
+                NavRow(Icons.Rounded.CalendarMonth, Color(0xFF0E9AA7), "Hisob oyi", "${s.monthStartDay}-sana") { onOpen("period") }
             }
         }
 
@@ -350,20 +354,25 @@ private fun SecurityPage(vm: FinanceViewModel, onBack: () -> Unit) {
                 Hint("Excel zaxira va chek rasmlari shifrlanmaydi. Ilovani o'chirib qayta o'rnatsangiz, shifrlangan ma'lumotni tiklab bo'lmaydi, shuning uchun Excel nusxa oling.")
             }
         }
-        item {
-            AppCard {
-                Text("Qulflash vaqti", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Hint("Ilova fonda shuncha turgach, qayta PIN so'raladi")
-                Spacer(Modifier.height(12.dp))
-                SegmentedToggle(
-                    options = listOf("Darhol", "15 soniya", "1 daqiqa", "5 daqiqa"),
-                    selected = delays.indexOf(s.lockDelaySec).coerceAtLeast(0),
-                    onSelect = { vm.setLockDelay(delays[it]) },
-                )
-                if (!s.hasPin) {
+        if (s.hasPin) {
+            item {
+                AppCard {
+                    Text("Qulflash vaqti", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    Hint("Ilova fonda shuncha turgach, qayta PIN so'raladi")
+                    Spacer(Modifier.height(12.dp))
+                    SegmentedToggle(
+                        options = listOf("Darhol", "15 soniya", "1 daqiqa", "5 daqiqa"),
+                        selected = delays.indexOf(s.lockDelaySec).coerceAtLeast(0),
+                        onSelect = { vm.setLockDelay(delays[it]) },
+                    )
                     Spacer(Modifier.height(8.dp))
-                    Hint("Qulflash faqat PIN o'rnatilganda ishlaydi.")
+                    SwitchRow(
+                        title = "Ekran o'chganda qulflash",
+                        subtitle = "Telefon ekrani o'chishi bilan ilova darhol qulflanadi",
+                        checked = s.lockOnScreenOff,
+                        onChange = vm::setLockOnScreenOff,
+                    )
                 }
             }
         }
@@ -462,16 +471,6 @@ private fun NotificationsPage(vm: FinanceViewModel, onBack: () -> Unit) {
                 }
             }
         }
-        item {
-            AppCard {
-                SwitchRow(
-                    title = "Zaxira eslatmasi",
-                    subtitle = "Zaxira nusxa 7 kundan ortiq olinmasa, Bosh sahifada ogohlantiradi (avto-zaxira yoqilmagan bo'lsa)",
-                    checked = s.backupReminder,
-                    onChange = vm::setBackupReminder,
-                )
-            }
-        }
     }
 
     if (showTime) {
@@ -515,29 +514,52 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
         }
         item {
             AppCard {
-                SwitchRow(
-                    title = "Balansni yashirish",
-                    subtitle = "Summalar •••••• bilan almashtiriladi",
-                    checked = vm.data.hideBalance,
-                    onChange = vm::setHideBalance,
-                )
-            }
-        }
-        item {
-            AppCard {
-                Text("Matn o'lchami", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(12.dp))
-                SegmentedToggle(options = listOf("Oddiy", "Katta", "Juda katta"), selected = s.textScale, onSelect = vm::setTextScale)
-            }
-        }
-        item {
-            AppCard {
                 Text("Raqam ko'rinishi", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(12.dp))
                 SegmentedToggle(
                     options = listOf("1 500 000", "1.5 mln"),
                     selected = if (s.compactNumbers) 1 else 0,
                     onSelect = { vm.setCompactNumbers(it == 1) },
+                )
+            }
+        }
+    }
+}
+
+// ───────────────────────── Hisob oyi ─────────────────────────
+
+@Composable
+private fun PeriodPage(vm: FinanceViewModel, onBack: () -> Unit) {
+    val s = vm.settings
+    Page("Hisob oyi", onBack) {
+        item {
+            AppCard {
+                Text("Boshlanish kuni", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Hint("Oylik 25-sanada tushsa, 25 deb qo'ying: oy balansi va hisobotlar 25 dan keyingi oyning 24 igacha hisoblanadi.")
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    IconButton(onClick = { vm.setMonthStartDay(s.monthStartDay - 1) }, enabled = s.monthStartDay > 1, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Rounded.Remove, contentDescription = "Kamaytirish")
+                    }
+                    Text(
+                        "${s.monthStartDay}-sana",
+                        modifier = Modifier.width(120.dp),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    IconButton(onClick = { vm.setMonthStartDay(s.monthStartDay + 1) }, enabled = s.monthStartDay < 28, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Rounded.Add, contentDescription = "Oshirish")
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Joriy davr: " + Dates.monthLabel(0),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -552,8 +574,13 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
     val context = LocalContext.current
     var confirmWipe by remember { mutableStateOf(false) }
     var typeWipe by remember { mutableStateOf(false) }
+    var advanced by rememberSaveable { mutableStateOf(false) }
+    var setPassword by remember { mutableStateOf(false) }
     val keeps = listOf(2, 4, 8, 12)
     val weekdays = listOf(0 to "Avto", 2 to "Du", 3 to "Se", 4 to "Ch", 5 to "Pa", 6 to "Ju", 7 to "Sh", 1 to "Ya")
+    val data = vm.data
+    val sizeKb = (java.io.File(context.filesDir, "moliya.json").length() / 1024L).coerceAtLeast(1L)
+    val records = data.txns.size + data.cushion.size + data.debts.size
 
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
@@ -573,25 +600,11 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
     Page("Ma'lumotlar va zaxira", onBack) {
         item {
             AppCard {
-                Text("Hisob oyi boshlanish kuni", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Hint("Oylik 25-sanada tushsa, 25 deb qo'ying: oy balansi va hisobotlar 25 dan 24 gacha hisoblanadi.")
+                Text("Holat", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    IconButton(onClick = { vm.setMonthStartDay(s.monthStartDay - 1) }, enabled = s.monthStartDay > 1, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Rounded.Remove, contentDescription = "Kamaytirish")
-                    }
-                    Text(
-                        "${s.monthStartDay}-sana",
-                        modifier = Modifier.width(120.dp),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    IconButton(onClick = { vm.setMonthStartDay(s.monthStartDay + 1) }, enabled = s.monthStartDay < 28, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.Rounded.Add, contentDescription = "Oshirish")
-                    }
-                }
+                StatusLine("Yozuvlar", "$records ta")
+                StatusLine("Ma'lumot hajmi", "$sizeKb KB" + if (s.encryptData) " · shifrlangan" else "")
+                StatusLine("Oxirgi zaxira", vm.lastBackupAt.takeIf { it > 0L }?.let { Dates.formatDateTime(it) } ?: "olinmagan")
             }
         }
         item {
@@ -608,48 +621,64 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                         else vm.setAutoBackup(true)
                     },
                 )
+                if (!s.autoBackup) {
+                    SwitchRow(
+                        title = "Zaxira eslatmasi",
+                        subtitle = "7 kundan ortiq zaxira olinmasa, Bosh sahifada ogohlantiradi",
+                        checked = s.backupReminder,
+                        onChange = vm::setBackupReminder,
+                    )
+                }
                 if (s.backupFolder.isNotEmpty()) {
                     TextButton(onClick = { folderLauncher.launch(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("Papkani o'zgartirish", fontWeight = FontWeight.SemiBold)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Text("Nechta fayl saqlansin", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                SegmentedToggle(
-                    options = keeps.map { "$it ta" },
-                    selected = keeps.indexOf(s.backupKeep).coerceAtLeast(0),
-                    onSelect = { vm.setBackupKeep(keeps[it]) },
-                )
-                Spacer(Modifier.height(12.dp))
-                Text("Qaysi kuni", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    weekdays.forEach { (value, label) ->
-                        FilterChip(
-                            selected = s.backupWeekday == value,
-                            onClick = { vm.setBackupWeekday(value) },
-                            label = { Text(label) },
-                            modifier = Modifier.heightIn(min = 40.dp),
+                if (s.autoBackup) {
+                    TextButton(onClick = { advanced = !advanced }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (advanced) "Qo'shimcha sozlamalarni yopish" else "Qo'shimcha sozlamalar", fontWeight = FontWeight.SemiBold)
+                    }
+                    if (advanced) {
+                        Text("Nechta fayl saqlansin", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        SegmentedToggle(
+                            options = keeps.map { "$it ta" },
+                            selected = keeps.indexOf(s.backupKeep).coerceAtLeast(0),
+                            onSelect = { vm.setBackupKeep(keeps[it]) },
                         )
+                        Spacer(Modifier.height(12.dp))
+                        Text("Qaysi kuni", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            weekdays.forEach { (value, label) ->
+                                FilterChip(
+                                    selected = s.backupWeekday == value,
+                                    onClick = { vm.setBackupWeekday(value) },
+                                    label = { Text(label) },
+                                    modifier = Modifier.heightIn(min = 40.dp),
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Hint("Avto: yoqilgan paytdan 7 kun. Kun tanlansa, shu kuni ertalab soat 3 atrofida saqlanadi.")
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                Hint("Avto: yoqilgan paytdan 7 kun. Kun tanlansa, shu kuni ertalab soat 3 atrofida saqlanadi. Fayllar PIN bilan himoyalanmaydi, papkani xavfsiz joyda tanlang.")
             }
         }
         item {
             AppCard {
-                Text("Excel", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "Oxirgi zaxira: " + (vm.lastBackupAt.takeIf { it > 0L }?.let { Dates.formatDateTime(it) } ?: "hali olinmagan"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                SwitchRow(
+                    title = "Zaxirani parol bilan himoyalash",
+                    subtitle = "Excel zaxira AES-256 bilan shifrlanadi. Fayl faqat Moliya'da, parol bilan tiklanadi.",
+                    checked = s.backupEncrypted,
+                    onChange = { on -> if (on) setPassword = true else vm.setBackupPassword(null) },
                 )
-                Spacer(Modifier.height(12.dp))
-                BigButton(text = "Yuklab olish va tiklash", onClick = onOpenBackup, modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(4.dp))
+                Hint("Parolni unutsangiz, zaxirani tiklab bo'lmaydi. Shifrlangan fayl Excelda ochilmaydi. \"Claude'ga yuborish\" shifrlanmagan nusxa yuboradi.")
             }
+        }
+        item {
+            BigButton(text = "Excel: yuklab olish va tiklash", onClick = onOpenBackup, modifier = Modifier.fillMaxWidth())
         }
         item {
             AppCard {
@@ -666,6 +695,45 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                 )
             }
         }
+    }
+
+    if (setPassword) {
+        var p1 by remember { mutableStateOf("") }
+        var p2 by remember { mutableStateOf("") }
+        val valid = p1.length >= 6 && p1 == p2
+        AlertDialog(
+            onDismissRequest = { setPassword = false },
+            title = { Text("Zaxira paroli") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = p1,
+                        onValueChange = { p1 = it },
+                        label = { Text("Parol (kamida 6 belgi)") },
+                        singleLine = true,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    OutlinedTextField(
+                        value = p2,
+                        onValueChange = { p2 = it },
+                        label = { Text("Parolni takrorlang") },
+                        singleLine = true,
+                        isError = p2.isNotEmpty() && p1 != p2,
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    Hint("Parolni xavfsiz joyda saqlang. Uni tiklab bo'lmaydi.")
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = valid, onClick = {
+                    vm.setBackupPassword(p1)
+                    setPassword = false
+                }) { Text("Yoqish") }
+            },
+            dismissButton = { TextButton(onClick = { setPassword = false }) { Text("Bekor qilish") } },
+        )
     }
 
     if (confirmWipe) {
@@ -707,6 +775,14 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
             },
             dismissButton = { TextButton(onClick = { typeWipe = false }) { Text("Bekor qilish") } },
         )
+    }
+}
+
+@Composable
+private fun StatusLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 

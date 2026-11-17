@@ -26,6 +26,9 @@ data class AppSettings(
     val dynamicColor: Boolean = false,
     val userName: String = "",
     val encryptData: Boolean = false,
+    val backupEncrypted: Boolean = false,
+    val backupPwd: String = "",
+    val lockOnScreenOff: Boolean = false,
     /** Fonda qancha turgach qayta qulflanadi (soniya) */
     val lockDelaySec: Int = 15,
     val backupReminder: Boolean = true,
@@ -67,6 +70,9 @@ object Prefs {
             dynamicColor = sp.getBoolean("dynamicColor", false),
             userName = sp.getString("userName", "") ?: "",
             encryptData = sp.getBoolean("encryptData", false),
+            backupEncrypted = sp.getBoolean("backupEncrypted", false),
+            backupPwd = sp.getString("backupPwd", "") ?: "",
+            lockOnScreenOff = sp.getBoolean("lockOnScreenOff", false),
             lockDelaySec = sp.getInt("lockDelaySec", 15),
             backupReminder = sp.getBoolean("backupReminder", true),
             dailyReminder = sp.getBoolean("dailyReminder", false),
@@ -97,6 +103,9 @@ object Prefs {
             .putBoolean("dynamicColor", s.dynamicColor)
             .putString("userName", s.userName)
             .putBoolean("encryptData", s.encryptData)
+            .putBoolean("backupEncrypted", s.backupEncrypted)
+            .putString("backupPwd", s.backupPwd)
+            .putBoolean("lockOnScreenOff", s.lockOnScreenOff)
             .putInt("lockDelaySec", s.lockDelaySec)
             .putBoolean("backupReminder", s.backupReminder)
             .putBoolean("dailyReminder", s.dailyReminder)

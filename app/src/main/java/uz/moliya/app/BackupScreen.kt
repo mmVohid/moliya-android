@@ -50,6 +50,8 @@ fun BackupScreen(
     notify: (String) -> Unit,
 ) {
     var pending by remember { mutableStateOf<FinanceData?>(null) }
+    var encryptedPending by remember { mutableStateOf<ByteArray?>(null) }
+    var askPassword by remember { mutableStateOf("") }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -62,7 +64,7 @@ fun BackupScreen(
                     try {
                         val stream = context.contentResolver.openOutputStream(uri)
                             ?: return@withContext false
-                        stream.use { XlsxExporter.write(data, it) }
+                        stream.use { it.write(BackupCrypto.export(context, data).first) }
                         true
                     } catch (e: Exception) {
                         false
@@ -89,7 +91,13 @@ fun BackupScreen(
                         if (stream == null) {
                             Pair(null, "Faylni ochib bo'lmadi")
                         } else {
-                            Pair(stream.use { XlsxImporter.read(it) }, null)
+                            val bytes = stream.use { it.readBytes() }
+                            if (BackupCrypto.isEncrypted(bytes)) {
+                                encryptedPending = bytes
+                                Pair(null, "")
+                            } else {
+                                Pair(XlsxImporter.read(java.io.ByteArrayInputStream(bytes)), null)
+                            }
                         }
                     } catch (e: ImportException) {
                         Pair(null, e.message)
@@ -98,9 +106,50 @@ fun BackupScreen(
                     }
                 }
                 val imported = outcome.first
-                if (imported != null) pending = imported else notify(outcome.second ?: "Faylni o'qib bo'lmadi")
+                if (imported != null) pending = imported else if (outcome.second != "") notify(outcome.second ?: "Faylni o'qib bo'lmadi")
             }
         }
+    }
+
+    val enc = encryptedPending
+    if (enc != null) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { encryptedPending = null; askPassword = "" },
+            title = { androidx.compose.material3.Text("Zaxira paroli") },
+            text = {
+                androidx.compose.material3.OutlinedTextField(
+                    value = askPassword,
+                    onValueChange = { askPassword = it },
+                    label = { androidx.compose.material3.Text("Parol") },
+                    singleLine = true,
+                    visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                )
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    enabled = askPassword.isNotEmpty(),
+                    onClick = {
+                        try {
+                            val plain = BackupCrypto.decrypt(enc, askPassword)
+                            pending = XlsxImporter.read(java.io.ByteArrayInputStream(plain))
+                            encryptedPending = null
+                            askPassword = ""
+                        } catch (e: ImportException) {
+                            notify(e.message ?: "Faylni o'qib bo'lmadi")
+                            encryptedPending = null
+                        } catch (e: Exception) {
+                            notify("Parol noto'g'ri yoki fayl buzilgan")
+                        }
+                    },
+                ) { androidx.compose.material3.Text("Ochish") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { encryptedPending = null; askPassword = "" }) {
+                    androidx.compose.material3.Text("Bekor qilish")
+                }
+            },
+        )
     }
 
     val recordCount = data.txns.size + data.cushion.size + data.debts.size

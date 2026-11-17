@@ -131,6 +131,14 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         Storage.save(getApplication<Application>(), data)
     }
 
+    fun setLockOnScreenOff(on: Boolean) = updateSettings(settings.copy(lockOnScreenOff = on))
+
+    /** null = zaxira shifrlashni o'chirish */
+    fun setBackupPassword(password: String?) {
+        if (password.isNullOrEmpty()) updateSettings(settings.copy(backupEncrypted = false, backupPwd = ""))
+        else updateSettings(settings.copy(backupEncrypted = true, backupPwd = BackupCrypto.sealPassword(password)))
+    }
+
     fun setUserName(name: String) = updateSettings(settings.copy(userName = name.trim().take(24)))
     fun setLockDelay(sec: Int) = updateSettings(settings.copy(lockDelaySec = sec))
     fun setBackupReminder(on: Boolean) = updateSettings(settings.copy(backupReminder = on))

@@ -64,6 +64,12 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this,
+            screenOffReceiver,
+            android.content.IntentFilter(Intent.ACTION_SCREEN_OFF),
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         if (vm.settings.reminders) Reminders.schedule(applicationContext)
         if (vm.settings.autoBackup) AutoBackup.schedule(applicationContext)
         handleIntent(intent)
@@ -117,6 +123,21 @@ class MainActivity : FragmentActivity() {
                 }
             }
             }
+        }
+    }
+
+    private val screenOffReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: Intent?) {
+            if (vm.settings.lockOnScreenOff) vm.lock()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(screenOffReceiver)
+        } catch (e: IllegalArgumentException) {
+            // ro'yxatdan o'tmagan
         }
     }
 

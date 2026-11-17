@@ -77,16 +77,17 @@ object AutoBackup {
         val resolver = context.contentResolver
         val tree = Uri.parse(folder)
         val parent = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        val name = PREFIX + Dates.iso(Dates.today()) + "_" + (System.currentTimeMillis() % 100000) + ".xlsx"
+        val (bytes, encrypted) = BackupCrypto.export(context, Storage.load(context))
+        val name = PREFIX + Dates.iso(Dates.today()) + "_" + (System.currentTimeMillis() % 100000) + if (encrypted) ".mbk" else ".xlsx"
         val created = DocumentsContract.createDocument(
             resolver,
             parent,
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            if (encrypted) "application/octet-stream" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             name,
         ) ?: throw IllegalStateException("Papkada fayl yaratib bo'lmadi. Papkani qayta tanlang.")
         val out = resolver.openOutputStream(created, "w")
             ?: throw IllegalStateException("Faylga yozib bo'lmadi.")
-        out.use { XlsxExporter.write(Storage.load(context), it) }
+        out.use { it.write(bytes) }
         prune(context, tree)
     }
 
@@ -107,7 +108,7 @@ object AutoBackup {
         )?.use { c ->
             while (c.moveToNext()) {
                 val fileName = c.getString(1) ?: continue
-                if (fileName.startsWith(PREFIX) && fileName.endsWith(".xlsx")) {
+                if (fileName.startsWith(PREFIX) && (fileName.endsWith(".xlsx") || fileName.endsWith(".mbk"))) {
                     files.add(Triple(DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0)), fileName, c.getLong(2)))
                 }
             }
