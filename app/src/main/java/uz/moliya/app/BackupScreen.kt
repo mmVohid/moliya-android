@@ -1,5 +1,9 @@
 package uz.moliya.app
 
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.CheckCircle
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,6 +50,9 @@ private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spr
 fun BackupScreen(
     data: FinanceData,
     onBackedUp: () -> Unit,
+    lastBackupAt: Long,
+    autoBackupOn: Boolean,
+    encrypted: Boolean,
     onRestore: (FinanceData) -> Unit,
     notify: (String) -> Unit,
 ) {
@@ -158,116 +165,112 @@ fun BackupScreen(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + LocalBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { ScreenHeader("Backup", "Ma'lumotlaringizni Excelga saqlang") }
+        item { ScreenHeader("Backup", "Ma'lumotlaringiz xavfsiz turishi uchun") }
 
         item {
-            AppCard {
+            val now = System.currentTimeMillis()
+            val ageDays = if (lastBackupAt > 0L) ((now - lastBackupAt) / 86_400_000L).toInt() else -1
+            val state = when {
+                ageDays < 0 -> 0
+                ageDays <= 7 -> 2
+                else -> 1
+            }
+            val color = when (state) {
+                2 -> Brand.income
+                1 -> Brand.warning
+                else -> Brand.expense
+            }
+            val container = color.copy(alpha = 0.10f)
+            AppCard(containerColor = container, padding = 20.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier
                             .size(56.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
+                            .background(color.copy(alpha = 0.18f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            Icons.Rounded.Backup,
+                            if (state == 2) Icons.Rounded.CheckCircle else if (state == 1) Icons.Rounded.Warning else Icons.Rounded.Backup,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(28.dp),
+                            tint = color,
+                            modifier = Modifier.size(30.dp),
                         )
                     }
                     Spacer(Modifier.width(16.dp))
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(
-                            if (data.lastBackup == 0L) "Hali zaxira olinmagan" else "Oxirgi zaxira",
+                            when (state) {
+                                2 -> "Zaxira yangi"
+                                1 -> "Zaxira eskirgan"
+                                else -> "Zaxira olinmagan"
+                            },
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Bold,
+                            color = color,
                         )
                         Text(
-                            if (data.lastBackup == 0L) "Hozir birinchi nusxani oling" else Dates.formatDateTime(data.lastBackup),
+                            when {
+                                ageDays < 0 -> "Hozir birinchi nusxani oling"
+                                ageDays == 0 -> "Bugun, " + Dates.formatDateTime(lastBackupAt)
+                                else -> "$ageDays kun oldin, " + Dates.formatDateTime(lastBackupAt)
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
                 Spacer(Modifier.height(16.dp))
-                Text(
-                    "Saqlanadigan ma'lumot: ${data.txns.size} ta daromad/xarajat, ${data.cushion.size} ta yostiq yozuvi, ${data.debts.size} ta qarz.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoPill(if (autoBackupOn) "Avto-zaxira: yoqilgan" else "Avto-zaxira: o'chiq", autoBackupOn)
+                    InfoPill(if (encrypted) "Parol: yoqilgan" else "Parol: yo'q", encrypted)
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CountTile("Yozuvlar", data.txns.size, Modifier.weight(1f))
+                CountTile("Qarzlar", data.debts.size, Modifier.weight(1f))
+                CountTile("Yostiq", data.cushion.size, Modifier.weight(1f))
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 BigButton(
                     text = "Excelga yuklab olish",
                     icon = Icons.Rounded.FileDownload,
                     modifier = Modifier.fillMaxWidth(),
-                    onClick = { launcher.launch("moliya_${Dates.iso(System.currentTimeMillis())}.xlsx") },
+                    onClick = { launcher.launch("moliya_${Dates.iso(System.currentTimeMillis())}" + if (encrypted) ".mbk" else ".xlsx") },
                 )
-                Spacer(Modifier.height(12.dp))
-                OutlineBigButton(
-                    text = "Claude'ga yuborish",
-                    icon = Icons.Rounded.Send,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        val error = ClaudeShare.share(context, data)
-                        if (error != null) notify(error) else onBackedUp()
-                    },
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlineBigButton(
+                        text = "Tiklash",
+                        icon = Icons.Rounded.FileUpload,
+                        modifier = Modifier.weight(1f),
+                        onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                    )
+                    OutlineBigButton(
+                        text = "Claude'ga",
+                        icon = Icons.Rounded.Send,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            val error = ClaudeShare.share(context, data)
+                            if (error != null) notify(error) else onBackedUp()
+                        },
+                    )
+                }
             }
         }
 
         item {
             AppCard {
-                Text(
-                    "Excel'dan tiklash",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+                Text("Eslatma", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Telefon almashtirganda yoki ilova qayta o'rnatilganda, avval olingan Moliya Excel faylini tanlab ma'lumotlarni qaytaring.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(16.dp))
-                OutlineBigButton(
-                    text = "Fayldan tiklash",
-                    icon = Icons.Rounded.FileUpload,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { restoreLauncher.launch(arrayOf("*/*")) },
-                )
-            }
-        }
-
-        item {
-            AppCard {
-                Text(
-                    "Maslahat olish uchun",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(12.dp))
-                Step(1, "\"Excelga yuklab olish\" tugmasini bosing va joyni tanlang.")
-                Spacer(Modifier.height(10.dp))
-                Step(2, "Faylni Claude bilan suhbatga biriktiring.")
-                Spacer(Modifier.height(10.dp))
-                Step(3, "Maqsadingizni yozing, masalan: \"Oylik xarajatlarimni tahlil qil va tejash yo'llarini ayt\".")
-            }
-        }
-
-        item {
-            AppCard {
-                Text(
-                    "Muhim",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Ma'lumotlar faqat shu telefonda, ilova ichida saqlanadi va internetga chiqmaydi. " +
-                        "Ilova o'chirilsa yoki telefon almashtirilsa ma'lumotlar yo'qoladi, shuning uchun Excel nusxani oyda kamida bir marta oling." +
-                        if (recordCount == 0) " Hozircha ma'lumot kiritilmagan." else "",
+                    "Ma'lumot faqat shu telefonda saqlanadi. Ilova o'chirilsa yoki telefon almashsa yo'qoladi, shuning uchun Excel nusxani oyda kamida bir marta oling. " +
+                        "\"Claude'ga\" tugmasi faylni tahlil va maslahat uchun tayyorlab yuboradi. Avto-zaxira va parol Sozlamalarda yoqiladi.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -311,5 +314,29 @@ private fun Step(number: Int, text: String) {
         }
         Spacer(Modifier.width(12.dp))
         Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+    }
+}
+
+
+@Composable
+private fun InfoPill(text: String, on: Boolean) {
+    val color = if (on) Brand.income else MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+    )
+}
+
+@Composable
+private fun CountTile(label: String, count: Int, modifier: Modifier = Modifier) {
+    AppCard(modifier = modifier, padding = 14.dp) {
+        Text("$count", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

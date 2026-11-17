@@ -373,6 +373,9 @@ fun MoliyaApp(vm: FinanceViewModel) {
                     else -> BackupScreen(
                         data = data,
                         onBackedUp = vm::markBackup,
+                        lastBackupAt = vm.lastBackupAt,
+                        autoBackupOn = vm.settings.autoBackup,
+                        encrypted = vm.settings.backupEncrypted,
                         onRestore = vm::replaceData,
                         notify = notify,
                     )
