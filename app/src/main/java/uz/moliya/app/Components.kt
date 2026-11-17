@@ -240,7 +240,7 @@ fun SegmentedToggle(
                     .weight(1f)
                     .heightIn(min = 44.dp)
                     .clip(RoundedCornerShape(11.dp))
-                    .background(if (isSelected) Color.White else Color.Transparent)
+                    .background(if (isSelected) MaterialTheme.colorScheme.surface else Color.Transparent)
                     .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(index) }),
                 contentAlignment = Alignment.Center,
             ) {
@@ -464,6 +464,7 @@ fun ProgressRing(
     content: @Composable () -> Unit,
 ) {
     val animated by animateFloatAsState(targetValue = progress.coerceIn(0f, 1f), label = "progressRing")
+    val trackColor = Brand.track
     Box(modifier.size(diameter), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val strokePx = stroke.toPx()
@@ -471,7 +472,7 @@ fun ProgressRing(
             val arcSize = Size(this.size.width - strokePx, this.size.height - strokePx)
             val topLeft = Offset(inset, inset)
             drawArc(
-                color = Brand.track,
+                color = trackColor,
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,

@@ -51,6 +51,19 @@ data class Debt(
         get() = if (total <= 0L) 0f else (paid.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }
 
+/** Har oy takrorlanadigan yozuv (oylik maosh, ijara, kredit to'lovi va h.k.) */
+data class Recurring(
+    val id: Long,
+    val isIncome: Boolean,
+    val amount: Long,
+    val category: String,
+    val note: String,
+    /** Oyning qaysi kuni (1..31); qisqa oylarda oxirgi kunga tushadi */
+    val anchorDay: Int,
+    /** Keyingi yozuv qo'shiladigan sana (kun o'rtasi, millis) */
+    val nextDue: Long,
+)
+
 data class FinanceData(
     val txns: List<Txn> = emptyList(),
     val cushion: List<CushionEntry> = emptyList(),
@@ -59,6 +72,9 @@ data class FinanceData(
     val debts: List<Debt> = emptyList(),
     val lastBackup: Long = 0L,
     val hideBalance: Boolean = false,
+    /** Kategoriya -> oylik xarajat limiti (so'm) */
+    val limits: Map<String, Long> = emptyMap(),
+    val recurring: List<Recurring> = emptyList(),
 ) {
     val cushionSaved: Long get() = cushion.sumOf { it.amount }.coerceAtLeast(0L)
     val cushionTarget: Long get() = monthlyNeed * targetMonths
@@ -75,6 +91,44 @@ data class FinanceData(
 
     fun expense(start: Long, end: Long): Long =
         txns.filter { !it.isIncome && it.date >= start && it.date < end }.sumOf { it.amount }
+
+    fun categorySpent(category: String, start: Long, end: Long): Long =
+        txns.filter { !it.isIncome && it.category == category && it.date >= start && it.date < end }
+            .sumOf { it.amount }
+}
+
+object Recurrence {
+    /** Muddati kelgan takroriy yozuvlarni yozuvlar ro'yxatiga qo'shadi. O'zgarish bo'lmasa, o'sha obyektni qaytaradi. */
+    fun apply(d: FinanceData, today: Long): FinanceData {
+        if (d.recurring.isEmpty()) return d
+        val created = ArrayList<Txn>()
+        var changed = false
+        val updated = d.recurring.map { r ->
+            var due = r.nextDue
+            var guard = 0
+            while (due <= today && guard < 60) {
+                created.add(
+                    Txn(
+                        id = Ids.next(),
+                        isIncome = r.isIncome,
+                        amount = r.amount,
+                        category = r.category,
+                        note = if (r.note.isBlank()) "Takroriy" else r.note,
+                        date = due,
+                    ),
+                )
+                due = Dates.nextMonthDue(due, r.anchorDay)
+                guard++
+            }
+            if (due != r.nextDue) {
+                changed = true
+                r.copy(nextDue = due)
+            } else {
+                r
+            }
+        }
+        return if (changed) d.copy(txns = d.txns + created, recurring = updated) else d
+    }
 }
 
 object Categories {
@@ -182,6 +236,22 @@ object Dates {
         )
     }
 
+    fun dayOfMonth(millis: Long): Int = cal(millis).get(Calendar.DAY_OF_MONTH)
+
+    /** Keyingi oydagi shu kun (qisqa oyda oxirgi kun), kun o'rtasida. */
+    fun nextMonthDue(current: Long, anchorDay: Int): Long {
+        val c = cal(current)
+        c.set(Calendar.DAY_OF_MONTH, 1)
+        c.add(Calendar.MONTH, 1)
+        val last = c.getActualMaximum(Calendar.DAY_OF_MONTH)
+        c.set(Calendar.DAY_OF_MONTH, minOf(anchorDay, last))
+        c.set(Calendar.HOUR_OF_DAY, 12)
+        c.set(Calendar.MINUTE, 0)
+        c.set(Calendar.SECOND, 0)
+        c.set(Calendar.MILLISECOND, 0)
+        return c.timeInMillis
+    }
+
     /** "2026-11" ko'rinishidagi oy kaliti */
     fun monthKey(millis: Long): String {
         val c = cal(millis)
@@ -247,6 +317,24 @@ object Storage {
         root.put("targetMonths", d.targetMonths)
         root.put("lastBackup", d.lastBackup)
         root.put("hideBalance", d.hideBalance)
+
+        val limits = JSONObject()
+        for ((category, amount) in d.limits) limits.put(category, amount)
+        root.put("limits", limits)
+
+        val recurring = JSONArray()
+        for (r in d.recurring) {
+            val o = JSONObject()
+            o.put("id", r.id)
+            o.put("income", r.isIncome)
+            o.put("amount", r.amount)
+            o.put("category", r.category)
+            o.put("note", r.note)
+            o.put("anchorDay", r.anchorDay)
+            o.put("nextDue", r.nextDue)
+            recurring.put(o)
+        }
+        root.put("recurring", recurring)
 
         val txns = JSONArray()
         for (t in d.txns) {
@@ -343,5 +431,29 @@ object Storage {
         },
         lastBackup = o.optLong("lastBackup", 0L),
         hideBalance = o.optBoolean("hideBalance", false),
+        limits = parseLimits(o.optJSONObject("limits")),
+        recurring = o.optJSONArray("recurring").mapObjects {
+            Recurring(
+                id = it.getLong("id"),
+                isIncome = it.getBoolean("income"),
+                amount = it.getLong("amount"),
+                category = it.optString("category", "Boshqa"),
+                note = it.optString("note", ""),
+                anchorDay = it.optInt("anchorDay", 1),
+                nextDue = it.getLong("nextDue"),
+            )
+        },
     )
+
+    private fun parseLimits(o: JSONObject?): Map<String, Long> {
+        if (o == null) return emptyMap()
+        val out = LinkedHashMap<String, Long>()
+        val keys = o.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            val v = o.optLong(k, 0L)
+            if (v > 0L) out[k] = v
+        }
+        return out
+    }
 }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Visibility
@@ -43,7 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> Unit) {
+fun HomeScreen(
+    data: FinanceData,
+    onOpenTab: (Int) -> Unit,
+    onToggleHide: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     val start = Dates.monthStart(0)
     val end = Dates.monthStart(1)
     val income = data.income(start, end)
@@ -69,7 +75,20 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> 
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { ScreenHeader("Moliya", Dates.monthLabel(0)) }
+        item {
+            Box(Modifier.fillMaxWidth()) {
+                ScreenHeader("Moliya", Dates.monthLabel(0))
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 12.dp)
+                        .size(48.dp),
+                ) {
+                    Icon(Icons.Rounded.Settings, contentDescription = "Sozlamalar")
+                }
+            }
+        }
 
         item {
             HeroCard(
@@ -85,7 +104,7 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> 
             item {
                 AppCard(
                     onClick = { onOpenTab(4) },
-                    containerColor = Color(0xFFFFF7ED),
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                     padding = 16.dp,
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -107,7 +126,7 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> 
                                 if (data.lastBackup == 0L) "Hali Excelga yuklab olmagansiz. Backup bo'limiga o'ting."
                                 else "Oxirgi zaxira: ${Dates.format(data.lastBackup)}. Yangilab qo'ying.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Brand.ink,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
                         }
                     }
@@ -146,19 +165,25 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> 
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(12.dp))
-                if (byCategory.isEmpty()) {
+                val spentByName = byCategory.toMap()
+                val rowNames = (byCategory.take(5).map { it.first } + data.limits.keys)
+                    .distinct()
+                    .sortedByDescending { name -> spentByName[name] ?: 0L }
+                if (rowNames.isEmpty()) {
                     Text(
                         "Bu oy hali xarajat kiritilmagan.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
-                    byCategory.take(5).forEachIndexed { index, pair ->
+                    rowNames.forEachIndexed { index, name ->
                         if (index > 0) Spacer(Modifier.height(14.dp))
+                        val amount = spentByName[name] ?: 0L
                         CategoryBar(
-                            name = pair.first,
-                            amount = pair.second,
-                            share = if (expense > 0) pair.second.toFloat() / expense.toFloat() else 0f,
+                            name = name,
+                            amount = amount,
+                            share = if (expense > 0) amount.toFloat() / expense.toFloat() else 0f,
+                            limit = data.limits[name] ?: 0L,
                         )
                     }
                 }
@@ -191,7 +216,7 @@ private fun HeroCard(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Brand.primary, Brand.primaryDark)))
+            .background(Brush.linearGradient(listOf(Brand.heroStart, Brand.heroEnd)))
             .padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 24.dp),
     ) {
         Column {
@@ -335,8 +360,15 @@ private fun RowScope.Bar(value: Long, maxValue: Long, color: Color) {
 }
 
 @Composable
-private fun CategoryBar(name: String, amount: Long, share: Float) {
-    val color = Brand.categoryColor(name)
+private fun CategoryBar(name: String, amount: Long, share: Float, limit: Long) {
+    val base = Brand.categoryColor(name)
+    val ratio = if (limit > 0L) amount.toFloat() / limit.toFloat() else 0f
+    val barColor = when {
+        limit <= 0L -> base
+        ratio > 1f -> Brand.expense
+        ratio >= 0.8f -> Brand.warning
+        else -> base
+    }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -352,7 +384,16 @@ private fun CategoryBar(name: String, amount: Long, share: Float) {
             )
         }
         Spacer(Modifier.height(6.dp))
-        ProgressBar(progress = share, color = color)
+        ProgressBar(progress = if (limit > 0L) ratio else share, color = barColor)
+        if (limit > 0L) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (ratio > 1f) "Limit oshdi: ${formatMoney(amount - limit)} ortiqcha (limit ${formatMoney(limit)})"
+                else "Limitning ${(ratio * 100).toInt()}% ishlatildi (limit ${formatMoney(limit)})",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (ratio >= 0.8f) barColor else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

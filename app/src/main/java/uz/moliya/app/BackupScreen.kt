@@ -19,10 +19,15 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,8 +45,10 @@ private const val XLSX_MIME = "application/vnd.openxmlformats-officedocument.spr
 fun BackupScreen(
     data: FinanceData,
     onBackedUp: () -> Unit,
+    onRestore: (FinanceData) -> Unit,
     notify: (String) -> Unit,
 ) {
+    var pending by remember { mutableStateOf<FinanceData?>(null) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -66,6 +73,31 @@ fun BackupScreen(
                 } else {
                     notify("Saqlashda xatolik yuz berdi. Qayta urinib ko'ring.")
                 }
+            }
+        }
+    }
+
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                val outcome: Pair<FinanceData?, String?> = withContext(Dispatchers.IO) {
+                    try {
+                        val stream = context.contentResolver.openInputStream(uri)
+                        if (stream == null) {
+                            Pair(null, "Faylni ochib bo'lmadi")
+                        } else {
+                            Pair(stream.use { XlsxImporter.read(it) }, null)
+                        }
+                    } catch (e: ImportException) {
+                        Pair(null, e.message)
+                    } catch (e: Exception) {
+                        Pair(null, "Faylni o'qib bo'lmadi. Moliya'dan yuklab olingan .xlsx faylni tanlang.")
+                    }
+                }
+                val imported = outcome.first
+                if (imported != null) pending = imported else notify(outcome.second ?: "Faylni o'qib bo'lmadi")
             }
         }
     }
@@ -128,6 +160,29 @@ fun BackupScreen(
         item {
             AppCard {
                 Text(
+                    "Excel'dan tiklash",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Telefon almashtirganda yoki ilova qayta o'rnatilganda, avval olingan Moliya Excel faylini tanlab ma'lumotlarni qaytaring.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlineBigButton(
+                    text = "Fayldan tiklash",
+                    icon = Icons.Rounded.FileUpload,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                )
+            }
+        }
+
+        item {
+            AppCard {
+                Text(
                     "Maslahat olish uchun",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
@@ -158,6 +213,22 @@ fun BackupScreen(
                 )
             }
         }
+    }
+
+    val toRestore = pending
+    if (toRestore != null) {
+        ConfirmDialog(
+            title = "Ma'lumotlarni tiklash",
+            text = "Fayldan ${toRestore.txns.size} ta daromad/xarajat, ${toRestore.cushion.size} ta yostiq yozuvi, " +
+                "${toRestore.debts.size} ta qarz topildi. Hozirgi barcha ma'lumotlar shular bilan almashtiriladi. Davom etasizmi?",
+            confirmLabel = "Tiklash",
+            onConfirm = {
+                onRestore(toRestore)
+                pending = null
+                notify("Ma'lumotlar tiklandi")
+            },
+            onDismiss = { pending = null },
+        )
     }
 }
 

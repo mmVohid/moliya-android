@@ -17,6 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
@@ -43,7 +45,12 @@ fun CashFlowScreen(
     data: FinanceData,
     onAdd: (Txn) -> Unit,
     onDelete: (Long) -> Unit,
+    onAddRecurring: (Recurring) -> Unit,
+    onDeleteRecurring: (Long) -> Unit,
+    onSaveLimits: (Map<String, Long>) -> Unit,
 ) {
+    var showRecurring by remember { mutableStateOf(false) }
+    var showLimits by remember { mutableStateOf(false) }
     var offset by rememberSaveable { mutableStateOf(0) }
     var filter by rememberSaveable { mutableStateOf(0) }
     var showAdd by remember { mutableStateOf(false) }
@@ -89,6 +96,23 @@ fun CashFlowScreen(
             }
 
             item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlineBigButton(
+                        text = "Takroriy" + if (data.recurring.isNotEmpty()) " (${data.recurring.size})" else "",
+                        icon = Icons.Rounded.Repeat,
+                        onClick = { showRecurring = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlineBigButton(
+                        text = "Limitlar" + if (data.limits.isNotEmpty()) " (${data.limits.size})" else "",
+                        icon = Icons.Rounded.Tune,
+                        onClick = { showLimits = true },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            item {
                 SegmentedToggle(
                     options = listOf("Hammasi", "Daromad", "Xarajat"),
                     selected = filter,
@@ -125,6 +149,23 @@ fun CashFlowScreen(
 
     if (showAdd) {
         AddTxnSheet(onDismiss = { showAdd = false }, onSave = onAdd)
+    }
+
+    if (showRecurring) {
+        RecurringSheet(
+            items = data.recurring,
+            onAdd = onAddRecurring,
+            onDelete = onDeleteRecurring,
+            onDismiss = { showRecurring = false },
+        )
+    }
+
+    if (showLimits) {
+        LimitsSheet(
+            limits = data.limits,
+            onSave = onSaveLimits,
+            onDismiss = { showLimits = false },
+        )
     }
 
     val target = toDelete

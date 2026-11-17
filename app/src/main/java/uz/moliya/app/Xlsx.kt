@@ -26,6 +26,8 @@ object XlsxExporter {
             cushionSheet(data),
             debtSheet(data),
             paymentSheet(data),
+            limitSheet(data),
+            recurringSheet(data),
         )
         ZipOutputStream(BufferedOutputStream(out)).use { zip ->
             zip.entry("[Content_Types].xml", contentTypes(sheets.size))
@@ -145,6 +147,31 @@ object XlsxExporter {
             }
         }
         return Sheet("Qarz tolovlari", listOf(26, 22, 14, 18), rows)
+    }
+
+    private fun limitSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Kategoriya", "Oylik limit (so'm)"))
+        for ((category, amount) in d.limits) rows.add(listOf(category, amount))
+        return Sheet("Limitlar", listOf(26, 20), rows)
+    }
+
+    private fun recurringSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(
+            listOf("Turi", "Kategoriya", "Summa (so'm)", "Izoh", "Kuni", "Keyingi sana"),
+        )
+        for (r in d.recurring) {
+            rows.add(
+                listOf(
+                    if (r.isIncome) "Daromad" else "Xarajat",
+                    r.category,
+                    r.amount,
+                    r.note,
+                    r.anchorDay,
+                    Dates.iso(r.nextDue),
+                ),
+            )
+        }
+        return Sheet("Takroriy", listOf(12, 22, 18, 30, 8, 16), rows)
     }
 
     // ───── XML ─────
