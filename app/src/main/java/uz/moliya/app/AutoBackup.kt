@@ -16,6 +16,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.WorkManager
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 /** Haftada bir marta ma'lumotni foydalanuvchi tanlagan papkaga Excel qilib saqlaydi. */
@@ -39,15 +40,32 @@ object AutoBackup {
     private const val WORK_NAME = "moliya_avto_backup"
     private const val CHANNEL_ID = "avto_backup"
     private const val NOTIFICATION_ID = 1002
-    private const val KEEP = 4
     private const val PREFIX = "moliya_auto_"
 
-    fun schedule(context: Context) {
+    fun schedule(context: Context, replace: Boolean = false) {
+        val weekday = Prefs.load(context).backupWeekday
+        val delayMs = if (weekday in 1..7) {
+            val now = Calendar.getInstance()
+            val next = Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_WEEK, weekday)
+                set(Calendar.HOUR_OF_DAY, 3)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                if (!after(now)) add(Calendar.DAY_OF_YEAR, 7)
+            }
+            next.timeInMillis - now.timeInMillis
+        } else {
+            TimeUnit.HOURS.toMillis(1)
+        }
         val request = PeriodicWorkRequestBuilder<AutoBackupWorker>(7, TimeUnit.DAYS)
-            .setInitialDelay(1, TimeUnit.HOURS)
+            .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
             .build()
-        WorkManager.getInstance(context)
-            .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WORK_NAME,
+            if (replace) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 
     fun cancel(context: Context) {
@@ -94,7 +112,7 @@ object AutoBackup {
                 }
             }
         }
-        files.sortedByDescending { it.third }.drop(KEEP).forEach {
+        files.sortedByDescending { it.third }.drop(Prefs.load(context).backupKeep.coerceAtLeast(1)).forEach {
             try {
                 DocumentsContract.deleteDocument(resolver, it.first)
             } catch (e: Exception) {

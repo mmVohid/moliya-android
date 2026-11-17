@@ -220,10 +220,17 @@ object XlsxImporter {
         }
         val customExpense = ArrayList<String>()
         val customIncome = ArrayList<String>()
+        val fullExpense = ArrayList<String>()
+        val fullIncome = ArrayList<String>()
         for (r in sheets["Kategoriyalar"].dataRows()) {
             val name = r.col(1)
             if (name.isEmpty()) continue
-            if (r.col(0).equals("Daromad", true)) customIncome.add(name) else customExpense.add(name)
+            val income = r.col(0).equals("Daromad", true)
+            if (r.col(2).equals("ha", true)) {
+                if (income) fullIncome.add(name) else fullExpense.add(name)
+            } else {
+                if (income) customIncome.add(name) else customExpense.add(name)
+            }
         }
         val reflections = sheets["Refleksiya"].dataRows().mapNotNull { r ->
             if (r.col(0).isEmpty()) null
@@ -250,6 +257,8 @@ object XlsxImporter {
             transfers = transfers,
             customExpense = customExpense,
             customIncome = customIncome,
+            expenseList = fullExpense,
+            incomeList = fullIncome,
         )
     }
 

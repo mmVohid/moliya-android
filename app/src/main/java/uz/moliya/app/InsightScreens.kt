@@ -164,9 +164,9 @@ private fun LineChart(values: List<Long>, color: Color) {
 @Composable
 fun YearScreen(data: FinanceData, onBack: () -> Unit) {
     var yearOffset by rememberSaveable { mutableStateOf(0) }
-    val curMonth = Calendar.getInstance().get(Calendar.MONTH)
+    val curMonth = Dates.currentPeriodMonthIndex()
     val firstOffset = -curMonth + 12 * yearOffset
-    val year = Calendar.getInstance().get(Calendar.YEAR) + yearOffset
+    val year = Dates.currentPeriodYear() + yearOffset
     val months = (0..11).map { firstOffset + it }
     val incomes = months.map { data.income(Dates.monthStart(it), Dates.monthStart(it + 1)) }
     val expenses = months.map { data.expense(Dates.monthStart(it), Dates.monthStart(it + 1)) }

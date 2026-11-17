@@ -3,6 +3,7 @@
 
     <!-- Ma'lumot faqat ilovaning ichki xotirasida; Excel fayl tizim oynasi orqali foydalanuvchi tanlagan joyga saqlanadi.
          Quyidagi ruxsatlar: barmoq izi bilan ochish va qarz muddati eslatmalari (ixtiyoriy) uchun. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 

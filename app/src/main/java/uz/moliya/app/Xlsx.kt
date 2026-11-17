@@ -256,10 +256,10 @@ object XlsxExporter {
     }
 
     private fun categorySheet(d: FinanceData): Sheet {
-        val rows = mutableListOf<List<Any>>(listOf("Turi", "Nomi"))
-        d.customExpense.forEach { rows.add(listOf("Xarajat", it)) }
-        d.customIncome.forEach { rows.add(listOf("Daromad", it)) }
-        return Sheet("Kategoriyalar", listOf(12, 26), rows)
+        val rows = mutableListOf<List<Any>>(listOf("Turi", "Nomi", "To'liq ro'yxat"))
+        d.expenseCategories.forEach { rows.add(listOf("Xarajat", it, "ha")) }
+        d.incomeCategories.forEach { rows.add(listOf("Daromad", it, "ha")) }
+        return Sheet("Kategoriyalar", listOf(12, 26, 16), rows)
     }
 
     private fun budgetSheet(d: FinanceData): Sheet {

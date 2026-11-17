@@ -62,6 +62,9 @@ fun HomeScreen(
     onToggleHide: () -> Unit,
     onOpenSettings: () -> Unit,
     lastBackupAt: Long,
+    userName: String,
+    cards: Int,
+    backupReminder: Boolean,
     autoBackupOn: Boolean,
     firstEntryAt: Long,
     onQuickAdd: (Boolean) -> Unit,
@@ -89,7 +92,7 @@ fun HomeScreen(
     val weekMs = 7L * 24 * 60 * 60 * 1000
     // Avto-zaxira yoqilmagan bo'lsa: oxirgi nusxadan (yo'q bo'lsa birinchi yozuvdan) 7 kun o'tgach ogohlantiramiz
     val reference = if (lastBackupAt > 0L) lastBackupAt else firstEntryAt
-    val staleBackup = !data.isEmpty && !autoBackupOn && reference > 0L &&
+    val staleBackup = backupReminder && !data.isEmpty && !autoBackupOn && reference > 0L &&
         System.currentTimeMillis() - reference > weekMs
     val staleDays = ((System.currentTimeMillis() - reference) / (24L * 60 * 60 * 1000)).toInt()
 
@@ -99,7 +102,7 @@ fun HomeScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth()) {
-                ScreenHeader("Moliya", Dates.monthLabel(0))
+                ScreenHeader(if (userName.isBlank()) "Moliya" else "Salom, $userName", Dates.monthLabel(0))
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier
@@ -198,9 +201,9 @@ fun HomeScreen(
                 }
             }
         } else {
-        item { SectionTitle("Bu oy") }
-        item { SavingsRateCard(data = data, onClick = onOpenReport) }
-        item {
+        if (cards and 6 != 0) item { SectionTitle("Bu oy") }
+        if (cards and 4 != 0) item { SavingsRateCard(data = data, onClick = onOpenReport) }
+        if (cards and 2 != 0) item {
             AppCard {
                 Text(
                     "Bu oy xarajatlari",
@@ -233,8 +236,8 @@ fun HomeScreen(
             }
         }
 
-        item { SectionTitle("Oxirgi 12 oy") }
-        item {
+        if (cards and 1 != 0) item { SectionTitle("Oxirgi 12 oy") }
+        if (cards and 1 != 0) item {
             AppCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     LegendDot("Daromad", Brand.income)
@@ -255,8 +258,8 @@ fun HomeScreen(
             }
         }
 
-        item { SectionTitle("Jamg'arma va qarzlar") }
-        item {
+        if (cards and 8 != 0) item { SectionTitle("Jamg'arma va qarzlar") }
+        if (cards and 8 != 0) item {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -267,8 +270,8 @@ fun HomeScreen(
                 DebtMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(3) }
             }
         }
-        item { SectionTitle("Tahlil") }
-        item {
+        if (cards and 16 != 0) item { SectionTitle("Tahlil") }
+        if (cards and 16 != 0) item {
             AppCard(padding = 4.dp) {
                 NavRow(Icons.Rounded.Assessment, "Oylik hisobot", "Tejash, byudjet va xulosalar", onOpenReport)
                 NavRow(Icons.Rounded.AccountBalance, "Sof boylik", "Hamyonlar, jamg'arma va qarzlar", onOpenNetWorth)

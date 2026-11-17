@@ -24,6 +24,23 @@ data class AppSettings(
     val onboarded: Boolean = false,
     /** Android 12+: ilova rangi fon rasmiga moslashadi */
     val dynamicColor: Boolean = false,
+    val userName: String = "",
+    /** Fonda qancha turgach qayta qulflanadi (soniya) */
+    val lockDelaySec: Int = 15,
+    val backupReminder: Boolean = true,
+    val dailyReminder: Boolean = false,
+    val dailyHour: Int = 21,
+    val dailyMinute: Int = 0,
+    /** 0 oddiy, 1 katta, 2 juda katta */
+    val textScale: Int = 0,
+    val compactNumbers: Boolean = false,
+    /** Bosh sahifa kartalari: 1 grafik, 2 kategoriyalar, 4 jamg'arma darajasi, 8 jamg'arma/qarz, 16 tahlil */
+    val homeCards: Int = 31,
+    /** Hisob oyi boshlanish kuni (1..28) */
+    val monthStartDay: Int = 1,
+    val backupKeep: Int = 4,
+    /** 0 = yoqilgan paytdan 7 kun; 1..7 = Calendar.DAY_OF_WEEK */
+    val backupWeekday: Int = 0,
     /** Birinchi yozuv kiritilgan vaqt (zaxira eslatmasi shundan hisoblanadi) */
     val firstEntryAt: Long = 0L,
 ) {
@@ -47,6 +64,18 @@ object Prefs {
             secureScreen = sp.getBoolean("secureScreen", false),
             onboarded = sp.getBoolean("onboarded", false),
             dynamicColor = sp.getBoolean("dynamicColor", false),
+            userName = sp.getString("userName", "") ?: "",
+            lockDelaySec = sp.getInt("lockDelaySec", 15),
+            backupReminder = sp.getBoolean("backupReminder", true),
+            dailyReminder = sp.getBoolean("dailyReminder", false),
+            dailyHour = sp.getInt("dailyHour", 21),
+            dailyMinute = sp.getInt("dailyMinute", 0),
+            textScale = sp.getInt("textScale", 0),
+            compactNumbers = sp.getBoolean("compactNumbers", false),
+            homeCards = sp.getInt("homeCards", 31),
+            monthStartDay = sp.getInt("monthStartDay", 1),
+            backupKeep = sp.getInt("backupKeep", 4),
+            backupWeekday = sp.getInt("backupWeekday", 0),
             firstEntryAt = sp.getLong("firstEntryAt", 0L),
         )
     }
@@ -64,6 +93,18 @@ object Prefs {
             .putBoolean("secureScreen", s.secureScreen)
             .putBoolean("onboarded", s.onboarded)
             .putBoolean("dynamicColor", s.dynamicColor)
+            .putString("userName", s.userName)
+            .putInt("lockDelaySec", s.lockDelaySec)
+            .putBoolean("backupReminder", s.backupReminder)
+            .putBoolean("dailyReminder", s.dailyReminder)
+            .putInt("dailyHour", s.dailyHour)
+            .putInt("dailyMinute", s.dailyMinute)
+            .putInt("textScale", s.textScale)
+            .putBoolean("compactNumbers", s.compactNumbers)
+            .putInt("homeCards", s.homeCards)
+            .putInt("monthStartDay", s.monthStartDay)
+            .putInt("backupKeep", s.backupKeep)
+            .putInt("backupWeekday", s.backupWeekday)
             .putLong("firstEntryAt", s.firstEntryAt)
             .apply()
     }

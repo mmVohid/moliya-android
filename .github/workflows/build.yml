@@ -41,4 +41,4 @@ jobs:
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest Moliya.apk \
             --title "Moliya (so'nggi versiya)" \
-            --notes "Debug APK. Telefonda yuklab olib o'rnating."
+            --notes "Debug APK. Telefonda yuklab olib o'rnating. sha:${GITHUB_SHA}"

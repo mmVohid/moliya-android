@@ -1,5 +1,8 @@
 package uz.moliya.app
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -141,9 +144,12 @@ data class FinanceData(
     val transfers: List<Transfer> = emptyList(),
     val customExpense: List<String> = emptyList(),
     val customIncome: List<String> = emptyList(),
+    /** To'liq (tahrirlangan) ro'yxatlar; bo'sh bo'lsa standart + o'zingiz qo'shganlar */
+    val expenseList: List<String> = emptyList(),
+    val incomeList: List<String> = emptyList(),
 ) {
-    val expenseCategories: List<String> get() = Categories.expense + customExpense
-    val incomeCategories: List<String> get() = Categories.income + customIncome
+    val expenseCategories: List<String> get() = if (expenseList.isNotEmpty()) expenseList else Categories.expense + customExpense
+    val incomeCategories: List<String> get() = if (incomeList.isNotEmpty()) incomeList else Categories.income + customIncome
 
     fun walletBalance(w: Wallet): Long {
         val flow = txns.filter { it.walletId == w.id }.sumOf { if (it.isIncome) it.amount else -it.amount }
@@ -269,7 +275,21 @@ object Ids {
 
 // ───────────────────────── Formatlash ─────────────────────────
 
+/** Raqam ko'rinishi: false = 1 500 000 so'm, true = 1.5 mln so'm */
+object NumberFormat {
+    var compact by mutableStateOf(false)
+}
+
 fun formatMoney(value: Long): String {
+    if (NumberFormat.compact && Math.abs(value) >= 1_000_000L) {
+        val a = Math.abs(value).toDouble()
+        val text = if (a >= 1_000_000_000.0) {
+            String.format(Locale.US, "%.1f", a / 1_000_000_000.0).removeSuffix(".0") + " mlrd"
+        } else {
+            String.format(Locale.US, "%.1f", a / 1_000_000.0).removeSuffix(".0") + " mln"
+        }
+        return (if (value < 0) "−" else "") + text + " so'm"
+    }
     val negative = value < 0
     val digits = Math.abs(value).toString()
     val sb = StringBuilder()
@@ -313,32 +333,44 @@ object Dates {
 
     fun today(): Long = noon(System.currentTimeMillis())
 
-    /** offset = 0 joriy oy, -1 o'tgan oy, 1 keyingi oy */
-    fun monthStart(offset: Int): Long {
+    /** Hisob oyi boshlanish kuni (1..28). Sozlamalardan o'rnatiladi. */
+    var startDay by mutableStateOf(1)
+
+    private fun periodCal(offset: Int): Calendar {
+        val d = startDay.coerceIn(1, 28)
         val c = Calendar.getInstance()
+        val shift = if (c.get(Calendar.DAY_OF_MONTH) < d) -1 else 0
         c.set(Calendar.DAY_OF_MONTH, 1)
+        c.add(Calendar.MONTH, offset + shift)
+        c.set(Calendar.DAY_OF_MONTH, d)
+        return c
+    }
+
+    /** offset = 0 joriy davr, -1 o'tgan davr, 1 keyingi davr */
+    fun monthStart(offset: Int): Long {
+        val c = periodCal(offset)
         c.set(Calendar.HOUR_OF_DAY, 0)
         c.set(Calendar.MINUTE, 0)
         c.set(Calendar.SECOND, 0)
         c.set(Calendar.MILLISECOND, 0)
-        c.add(Calendar.MONTH, offset)
         return c.timeInMillis
     }
 
-    private fun monthCal(offset: Int): Calendar {
-        val c = Calendar.getInstance()
-        c.set(Calendar.DAY_OF_MONTH, 1)
-        c.add(Calendar.MONTH, offset)
-        return c
-    }
-
     fun monthLabel(offset: Int): String {
-        val c = monthCal(offset)
-        return monthNames[c.get(Calendar.MONTH)] + " " + c.get(Calendar.YEAR)
+        val c = periodCal(offset)
+        if (startDay <= 1) return monthNames[c.get(Calendar.MONTH)] + " " + c.get(Calendar.YEAR)
+        val e = periodCal(offset + 1)
+        e.add(Calendar.DAY_OF_MONTH, -1)
+        return "${c.get(Calendar.DAY_OF_MONTH)} ${monthNames[c.get(Calendar.MONTH)].take(3)} – " +
+            "${e.get(Calendar.DAY_OF_MONTH)} ${monthNames[e.get(Calendar.MONTH)].take(3)}"
     }
 
     fun shortMonth(offset: Int): String =
-        monthNames[monthCal(offset).get(Calendar.MONTH)].take(3)
+        monthNames[periodCal(offset).get(Calendar.MONTH)].take(3)
+
+    /** Joriy hisob davri qaysi oy/yilda boshlangan (yillik hisobot uchun) */
+    fun currentPeriodMonthIndex(): Int = periodCal(0).get(Calendar.MONTH)
+    fun currentPeriodYear(): Int = periodCal(0).get(Calendar.YEAR)
 
     fun format(millis: Long): String {
         val c = cal(millis)
@@ -535,6 +567,8 @@ object Storage {
         root.put("transfers", transfers)
         root.put("cEx", JSONArray(d.customExpense))
         root.put("cIn", JSONArray(d.customIncome))
+        root.put("eList", JSONArray(d.expenseList))
+        root.put("iList", JSONArray(d.incomeList))
 
         val txns = JSONArray()
         for (t in d.txns) {
@@ -692,6 +726,8 @@ object Storage {
         },
         customExpense = o.optJSONArray("cEx").strings(),
         customIncome = o.optJSONArray("cIn").strings(),
+        expenseList = o.optJSONArray("eList").strings(),
+        incomeList = o.optJSONArray("iList").strings(),
         limits = parseLimits(o.optJSONObject("limits")),
         recurring = o.optJSONArray("recurring").mapObjects {
             Recurring(

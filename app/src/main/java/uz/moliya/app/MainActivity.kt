@@ -1,5 +1,6 @@
 package uz.moliya.app
 
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -85,6 +86,13 @@ class MainActivity : FragmentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 onDispose { }
             }
+            val baseDensity = LocalDensity.current
+            val factor = when (settings.textScale) {
+                1 -> 1.15f
+                2 -> 1.3f
+                else -> 1f
+            }
+            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, baseDensity.fontScale * factor)) {
             MoliyaTheme(dark = dark, dynamic = settings.dynamicColor) {
                 if (vm.locked) {
                     LockScreen(
@@ -108,6 +116,7 @@ class MainActivity : FragmentActivity() {
                     MoliyaApp(vm)
                 }
             }
+            }
         }
     }
 
@@ -128,8 +137,8 @@ class MainActivity : FragmentActivity() {
     override fun onStart() {
         super.onStart()
         vm.refreshSettings()
-        // Fonda 15 soniyadan ortiq turgan bo'lsa, qayta qulflaymiz
-        if (stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > 15_000L) vm.lock()
+        // Fonda sozlamadagi vaqtdan ortiq turgan bo'lsa, qayta qulflaymiz
+        if (stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > vm.settings.lockDelaySec * 1000L) vm.lock()
     }
 
     companion object {
@@ -216,17 +225,11 @@ fun MoliyaApp(vm: FinanceViewModel) {
             Box(Modifier.padding(padding)) {
                 if (showSettings) {
                     SettingsScreen(
-                        settings = vm.settings,
-                        verifyPin = vm::verifyPin,
-                        onSetPin = vm::setPin,
-                        onClearPin = vm::clearPin,
-                        onBiometric = vm::setBiometric,
-                        onTheme = vm::setTheme,
-                        onReminders = vm::setReminders,
-                        onAutoBackup = vm::setAutoBackup,
-                        onPickFolder = vm::setBackupFolder,
-                        onSecureScreen = vm::setSecureScreen,
-                        onDynamicColor = vm::setDynamicColor,
+                        vm = vm,
+                        onOpenBackup = {
+                            showSettings = false
+                            tab = 4
+                        },
                         onBack = { showSettings = false },
                     )
                 } else if (showReport) {
@@ -270,6 +273,9 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onToggleHide = { vm.setHideBalance(!data.hideBalance) },
                         onOpenSettings = { showSettings = true },
                         lastBackupAt = vm.lastBackupAt,
+                    userName = vm.settings.userName,
+                    cards = vm.settings.homeCards,
+                    backupReminder = vm.settings.backupReminder,
                         autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
                         firstEntryAt = vm.settings.firstEntryAt,
                         onQuickAdd = { income ->

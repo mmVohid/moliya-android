@@ -12,6 +12,7 @@ class QuickWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         val settings = Prefs.load(context)
+        Dates.startDay = settings.monthStartDay
         val data = Storage.load(context)
         val hidden = data.hideBalance || settings.pinHash.isNotEmpty()
         val spent = data.expense(Dates.monthStart(0), Dates.monthStart(1))

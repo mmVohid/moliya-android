@@ -67,7 +67,7 @@ fun ReportScreen(
     val biggest = monthTxns.filter { !it.isIncome }.maxByOrNull { it.amount }
 
     val days = if (offset == 0) {
-        Math.max(1, Calendar.getInstance().get(Calendar.DAY_OF_MONTH))
+        Math.max(1, ((System.currentTimeMillis() - start) / 86_400_000L).toInt() + 1)
     } else {
         Math.max(1, ((end - start) / 86_400_000L).toInt())
     }

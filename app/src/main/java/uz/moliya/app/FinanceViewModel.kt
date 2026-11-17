@@ -20,9 +20,15 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     /** PIN o'rnatilgan bo'lsa, ilova qulflangan holda ochiladi. */
     var locked by mutableStateOf(settings.hasPin)
+
+    private fun syncGlobals() {
+        Dates.startDay = settings.monthStartDay
+        NumberFormat.compact = settings.compactNumbers
+    }
         private set
 
     init {
+        syncGlobals()
         val migrated = CategoryMigration.apply(data)
         if (migrated != data) {
             data = migrated
@@ -48,6 +54,7 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun updateSettings(next: AppSettings) {
         settings = next
+        syncGlobals()
         Prefs.save(getApplication<Application>(), next)
     }
 
@@ -77,10 +84,74 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun addTransfer(t: Transfer) = update { it.copy(transfers = it.transfers + t) }
     fun deleteTransfer(id: Long) = update { d -> d.copy(transfers = d.transfers.filterNot { it.id == id }) }
 
+    private fun FinanceData.cats(income: Boolean) = if (income) incomeCategories else expenseCategories
+
+    private fun FinanceData.withCats(income: Boolean, list: List<String>) =
+        if (income) copy(incomeList = list) else copy(expenseList = list)
+
     fun addCategory(income: Boolean, name: String) = update { d ->
         val n = name.trim()
-        if (n.isEmpty() || (d.expenseCategories + d.incomeCategories).any { it.equals(n, true) && (it in (if (income) d.incomeCategories else d.expenseCategories)) }) d
-        else if (income) d.copy(customIncome = d.customIncome + n) else d.copy(customExpense = d.customExpense + n)
+        val list = d.cats(income)
+        if (n.isEmpty() || list.any { it.equals(n, true) }) d else d.withCats(income, list + n)
+    }
+
+    fun renameCategory(income: Boolean, old: String, new: String) = update { d ->
+        val n = new.trim()
+        val list = d.cats(income)
+        if (n.isEmpty() || n == old || list.any { it.equals(n, true) }) {
+            d
+        } else {
+            val renamed = d.withCats(income, list.map { if (it == old) n else it })
+            renamed.copy(
+                txns = d.txns.map { if (it.isIncome == income && it.category == old) it.copy(category = n) else it },
+                templates = d.templates.map { if (it.isIncome == income && it.category == old) it.copy(category = n) else it },
+                limits = if (income) d.limits else d.limits.mapKeys { (k, _) -> if (k == old) n else k },
+            )
+        }
+    }
+
+    fun deleteCategory(income: Boolean, name: String) = update { d ->
+        val list = d.cats(income)
+        if (list.size <= 1) d
+        else d.withCats(income, list - name).copy(limits = if (income) d.limits else d.limits - name)
+    }
+
+    fun moveCategory(income: Boolean, name: String, delta: Int) = update { d ->
+        val list = d.cats(income).toMutableList()
+        val i = list.indexOf(name)
+        val k = i + delta
+        if (i < 0 || k !in list.indices) d else {
+            list[i] = list[k].also { list[k] = list[i] }
+            d.withCats(income, list)
+        }
+    }
+
+    fun setUserName(name: String) = updateSettings(settings.copy(userName = name.trim().take(24)))
+    fun setLockDelay(sec: Int) = updateSettings(settings.copy(lockDelaySec = sec))
+    fun setBackupReminder(on: Boolean) = updateSettings(settings.copy(backupReminder = on))
+    fun setTextScale(i: Int) = updateSettings(settings.copy(textScale = i))
+    fun setCompactNumbers(on: Boolean) = updateSettings(settings.copy(compactNumbers = on))
+    fun setHomeCards(mask: Int) = updateSettings(settings.copy(homeCards = mask))
+    fun setMonthStartDay(d: Int) = updateSettings(settings.copy(monthStartDay = d.coerceIn(1, 28)))
+
+    fun setDaily(on: Boolean, hour: Int, minute: Int) {
+        updateSettings(settings.copy(dailyReminder = on, dailyHour = hour, dailyMinute = minute))
+        if (on) DailyHabit.schedule(getApplication<Application>(), hour, minute) else DailyHabit.cancel(getApplication<Application>())
+    }
+
+    fun setBackupKeep(n: Int) = updateSettings(settings.copy(backupKeep = n))
+
+    fun setBackupWeekday(day: Int) {
+        updateSettings(settings.copy(backupWeekday = day))
+        if (settings.autoBackup) AutoBackup.schedule(getApplication<Application>(), replace = true)
+    }
+
+    /** Barcha moliyaviy ma'lumotni o'chiradi (sozlamalar va PIN saqlanadi). */
+    fun wipeAll() {
+        data = FinanceData()
+        Storage.save(getApplication<Application>(), data)
+        Receipts.deleteAll(getApplication<Application>())
+        QuickWidget.refresh(getApplication<Application>())
     }
 
     fun setDynamicColor(on: Boolean) = updateSettings(settings.copy(dynamicColor = on))
@@ -189,6 +260,8 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             transfers = imported.transfers,
             customExpense = imported.customExpense,
             customIncome = imported.customIncome,
+            expenseList = imported.expenseList,
+            incomeList = imported.incomeList,
         ) }
     }
 
@@ -220,6 +293,7 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     /** Fonda ishlagan avto-zaxira (worker) yangilagan sozlamalarni qayta o'qiydi. */
     fun refreshSettings() {
         settings = Prefs.load(getApplication<Application>())
+        syncGlobals()
     }
 
     /** Oxirgi zaxira vaqti: qo'lda yoki avtomatik, qaysi biri yangi bo'lsa */

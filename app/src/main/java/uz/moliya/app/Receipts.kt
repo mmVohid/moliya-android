@@ -52,6 +52,10 @@ object Receipts {
         return BitmapFactory.decodeFile(f.path, opts)?.asImageBitmap()
     }
 
+    fun deleteAll(context: Context) {
+        dir(context).listFiles()?.forEach { it.delete() }
+    }
+
     fun delete(context: Context, name: String) {
         if (name.isNotEmpty()) file(context, name).delete()
     }
