@@ -173,8 +173,7 @@ fun HomeScreen(
             }
         }
 
-        if (data.isEmpty) {
-        } else {
+        run {
         if (cards and 4 != 0) item { SectionTitle("Bu oy") }
         if (cards and 4 != 0) item { SavingsRateCard(data = data, onClick = onOpenReport) }
         if (cards and 1 != 0) item { SectionTitle("Oxirgi 12 oy") }
