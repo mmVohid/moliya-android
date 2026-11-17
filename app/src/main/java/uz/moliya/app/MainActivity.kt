@@ -71,6 +71,7 @@ class MainActivity : FragmentActivity() {
             androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         if (vm.settings.reminders) Reminders.schedule(applicationContext)
+        if (vm.settings.dailyReminder) DailyHabit.schedule(applicationContext)
         if (vm.settings.autoBackup) AutoBackup.schedule(applicationContext)
         handleIntent(intent)
         setContent {

@@ -102,9 +102,9 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun setCompactNumbers(on: Boolean) = updateSettings(settings.copy(compactNumbers = on))
     fun setMonthStartDay(d: Int) = updateSettings(settings.copy(monthStartDay = d.coerceIn(1, 28)))
 
-    fun setDaily(on: Boolean, hour: Int, minute: Int) {
-        updateSettings(settings.copy(dailyReminder = on, dailyHour = hour, dailyMinute = minute))
-        if (on) DailyHabit.schedule(getApplication<Application>(), hour, minute) else DailyHabit.cancel(getApplication<Application>())
+    fun setDaily(on: Boolean) {
+        updateSettings(settings.copy(dailyReminder = on))
+        if (on) DailyHabit.schedule(getApplication<Application>()) else DailyHabit.cancel(getApplication<Application>())
     }
 
     fun setBackupKeep(n: Int) = updateSettings(settings.copy(backupKeep = n))

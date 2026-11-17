@@ -90,7 +90,6 @@ internal fun NotificationsPage(vm: FinanceViewModel, onBack: () -> Unit) {
     val s = vm.settings
     val context = LocalContext.current
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var showTime by remember { mutableStateOf(false) }
     var allowed by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -147,40 +146,17 @@ internal fun NotificationsPage(vm: FinanceViewModel, onBack: () -> Unit) {
             AppCard {
                 SwitchRow(
                     title = "Kunlik odat eslatmasi",
-                    subtitle = "\"Bugungi xarajatlarni yozdingizmi?\" Bugun yozuv kiritgan bo'lsangiz, yuborilmaydi",
+                    subtitle = "Ilova ochilgandan keyin har 2 soatda (08:00–22:00) hazil-mutoyiba bilan eslatib turadi. Bugun yozuv kiritsangiz, jim turadi.",
                     checked = s.dailyReminder,
                     onChange = { on ->
-                        if (on) withPermission { vm.setDaily(true, s.dailyHour, s.dailyMinute) }
-                        else vm.setDaily(false, s.dailyHour, s.dailyMinute)
+                        if (on) withPermission { vm.setDaily(true) }
+                        else vm.setDaily(false)
                     },
                 )
-                if (s.dailyReminder) {
-                    Spacer(Modifier.height(8.dp))
-                    OutlineBigButton(
-                        text = "Vaqt: " + String.format(java.util.Locale.US, "%02d:%02d", s.dailyHour, s.dailyMinute),
-                        onClick = { showTime = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
             }
         }
     }
 
-    if (showTime) {
-        val state = rememberTimePickerState(initialHour = s.dailyHour, initialMinute = s.dailyMinute, is24Hour = true)
-        AlertDialog(
-            onDismissRequest = { showTime = false },
-            title = { Text("Eslatma vaqti") },
-            text = { TimePicker(state = state) },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.setDaily(true, state.hour, state.minute)
-                    showTime = false
-                }) { Text("Saqlash") }
-            },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text("Bekor qilish") } },
-        )
-    }
 }
 
 // ───────────────────────── Ko'rinish ─────────────────────────
