@@ -20,6 +20,10 @@ data class AppSettings(
     val lastAutoBackup: Long = 0L,
     /** Skrinshot va oxirgi ilovalar ko'rinishini yashirish */
     val secureScreen: Boolean = false,
+    /** Birinchi sozlash takliflari ko'rsatilganmi */
+    val onboarded: Boolean = false,
+    /** Birinchi yozuv kiritilgan vaqt (zaxira eslatmasi shundan hisoblanadi) */
+    val firstEntryAt: Long = 0L,
 ) {
     val hasPin: Boolean get() = pinHash.isNotEmpty()
 }
@@ -39,6 +43,8 @@ object Prefs {
             backupFolder = sp.getString("backupFolder", "") ?: "",
             lastAutoBackup = sp.getLong("lastAutoBackup", 0L),
             secureScreen = sp.getBoolean("secureScreen", false),
+            onboarded = sp.getBoolean("onboarded", false),
+            firstEntryAt = sp.getLong("firstEntryAt", 0L),
         )
     }
 
@@ -53,6 +59,8 @@ object Prefs {
             .putString("backupFolder", s.backupFolder)
             .putLong("lastAutoBackup", s.lastAutoBackup)
             .putBoolean("secureScreen", s.secureScreen)
+            .putBoolean("onboarded", s.onboarded)
+            .putLong("firstEntryAt", s.firstEntryAt)
             .apply()
     }
 }

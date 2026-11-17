@@ -29,10 +29,19 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             Storage.save(getApplication<Application>(), migrated)
         }
         applyRecurring()
+        // Mavjud foydalanuvchi uchun zaxira eslatmasi hisobi bugundan boshlanadi
+        if (!data.isEmpty && settings.firstEntryAt == 0L) {
+            updateSettings(settings.copy(firstEntryAt = System.currentTimeMillis()))
+        }
     }
+
+    fun completeOnboarding() = updateSettings(settings.copy(onboarded = true))
 
     private fun update(block: (FinanceData) -> FinanceData) {
         val next = block(data)
+        if (data.isEmpty && !next.isEmpty && settings.firstEntryAt == 0L) {
+            updateSettings(settings.copy(firstEntryAt = System.currentTimeMillis()))
+        }
         data = next
         Storage.save(getApplication<Application>(), next)
         QuickWidget.refresh(getApplication<Application>())

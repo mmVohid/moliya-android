@@ -82,6 +82,18 @@ class MainActivity : FragmentActivity() {
                         biometricEnabled = settings.biometric,
                         onUnlock = vm::unlock,
                     )
+                } else if (!settings.onboarded) {
+                    SetupScreen(
+                        settings = settings,
+                        onReminders = vm::setReminders,
+                        onSecureScreen = vm::setSecureScreen,
+                        onSetPin = vm::setPin,
+                        verifyPin = vm::verifyPin,
+                        onClearPin = vm::clearPin,
+                        onPickFolder = vm::setBackupFolder,
+                        onAutoBackup = vm::setAutoBackup,
+                        onFinish = vm::completeOnboarding,
+                    )
                 } else {
                     MoliyaApp(vm)
                 }
@@ -266,6 +278,8 @@ fun MoliyaApp(vm: FinanceViewModel) {
                     onToggleHide = { vm.setHideBalance(!data.hideBalance) },
                     onOpenSettings = { showSettings = true },
                     lastBackupAt = vm.lastBackupAt,
+                    autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
+                    firstEntryAt = vm.settings.firstEntryAt,
                     onQuickAdd = { income ->
                         vm.requestQuickAdd(income)
                     },

@@ -58,6 +58,8 @@ fun HomeScreen(
     onToggleHide: () -> Unit,
     onOpenSettings: () -> Unit,
     lastBackupAt: Long,
+    autoBackupOn: Boolean,
+    firstEntryAt: Long,
     onQuickAdd: (Boolean) -> Unit,
     onOpenReport: () -> Unit,
     onOpenNetWorth: () -> Unit,
@@ -80,9 +82,12 @@ fun HomeScreen(
         .map { entry -> entry.key to entry.value.sumOf { t -> t.amount } }
         .sortedByDescending { pair -> pair.second }
 
-    val monthMs = 30L * 24 * 60 * 60 * 1000
-    val staleBackup = !data.isEmpty &&
-        (lastBackupAt == 0L || System.currentTimeMillis() - lastBackupAt > monthMs)
+    val weekMs = 7L * 24 * 60 * 60 * 1000
+    // Avto-zaxira yoqilmagan bo'lsa: oxirgi nusxadan (yo'q bo'lsa birinchi yozuvdan) 7 kun o'tgach ogohlantiramiz
+    val reference = if (lastBackupAt > 0L) lastBackupAt else firstEntryAt
+    val staleBackup = !data.isEmpty && !autoBackupOn && reference > 0L &&
+        System.currentTimeMillis() - reference > weekMs
+    val staleDays = ((System.currentTimeMillis() - reference) / (24L * 60 * 60 * 1000)).toInt()
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
@@ -155,8 +160,8 @@ fun HomeScreen(
                                 color = Brand.warning,
                             )
                             Text(
-                                if (lastBackupAt == 0L) "Hali Excelga yuklab olmagansiz. Backup bo'limiga o'ting."
-                                else "Oxirgi zaxira: ${Dates.format(lastBackupAt)}. Yangilab qo'ying.",
+                                if (lastBackupAt == 0L) "Birinchi yozuvdan $staleDays kun o'tdi, hali zaxira olinmagan. Backup bo'limiga o'ting."
+                                else "Oxirgi zaxira $staleDays kun oldin (${Dates.format(lastBackupAt)}). Yangilab qo'ying.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
