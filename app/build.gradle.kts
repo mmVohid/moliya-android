@@ -12,9 +12,19 @@ android {
         applicationId = "uz.moliya.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionName = "1.0"
         buildConfigField("String", "GIT_SHA", "\"${System.getenv("GITHUB_SHA") ?: "dev"}\"")
+    }
+
+    // Barqaror imzo: har yangi versiya eskisi ustiga o'rnatiladi (o'chirib qayta o'rnatish shart emas)
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("moliya-debug.jks")
+            storePassword = "moliya2026"
+            keyAlias = "moliya"
+            keyPassword = "moliya2026"
+        }
     }
 
     buildTypes {
