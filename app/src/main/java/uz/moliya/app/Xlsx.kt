@@ -61,7 +61,8 @@ object XlsxExporter {
             listOf("Himoya yostig'i: maqsad summasi", d.cushionTarget),
             listOf("", ""),
             listOf("Faol qarzlar soni", d.debts.count { it.remaining > 0 }),
-            listOf("Qarz qoldig'i (jami)", d.debtRemaining),
+            listOf("Olingan qarzlar qoldig'i (men qarzdorman)", d.debtOwed),
+            listOf("Berilgan qarzlar qoldig'i (menga qarzdor)", d.debtLent),
         )
         return Sheet("Xulosa", listOf(44, 26), rows)
     }
@@ -111,12 +112,13 @@ object XlsxExporter {
 
     private fun debtSheet(d: FinanceData): Sheet {
         val rows = mutableListOf<List<Any>>(
-            listOf("Qarz nomi", "Umumiy summa", "To'langan", "Qoldiq", "Foiz (%)", "Muddat"),
+            listOf("Kim bilan", "Turi", "Umumiy summa", "To'langan/Qaytarilgan", "Qoldiq", "Foiz (%)", "Muddat"),
         )
         for (debt in d.debts) {
             rows.add(
                 listOf(
                     debt.name,
+                    if (debt.isLent) "Berilgan qarz (menga qarzdor)" else "Olingan qarz (men qarzdorman)",
                     debt.total,
                     debt.paid,
                     debt.remaining,
@@ -125,17 +127,24 @@ object XlsxExporter {
                 ),
             )
         }
-        return Sheet("Qarzlar", listOf(26, 18, 18, 18, 12, 14), rows)
+        return Sheet("Qarzlar", listOf(26, 30, 18, 24, 18, 12, 14), rows)
     }
 
     private fun paymentSheet(d: FinanceData): Sheet {
-        val rows = mutableListOf<List<Any>>(listOf("Qarz nomi", "Sana", "To'lov (so'm)"))
+        val rows = mutableListOf<List<Any>>(listOf("Kim bilan", "Turi", "Sana", "Summa (so'm)"))
         for (debt in d.debts) {
             for (p in debt.payments.sortedBy { it.date }) {
-                rows.add(listOf(debt.name, Dates.iso(p.date), p.amount))
+                rows.add(
+                    listOf(
+                        debt.name,
+                        if (debt.isLent) "Qaytarildi (menga)" else "To'landi (men)",
+                        Dates.iso(p.date),
+                        p.amount,
+                    ),
+                )
             }
         }
-        return Sheet("Qarz tolovlari", listOf(26, 14, 18), rows)
+        return Sheet("Qarz tolovlari", listOf(26, 22, 14, 18), rows)
     }
 
     // ───── XML ─────

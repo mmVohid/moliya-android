@@ -99,7 +99,11 @@ fun MoliyaApp(vm: FinanceViewModel = viewModel()) {
     ) { padding ->
         Box(Modifier.padding(padding)) {
             when (tab) {
-                0 -> HomeScreen(data = data, onOpenTab = { tab = it })
+                0 -> HomeScreen(
+                    data = data,
+                    onOpenTab = { tab = it },
+                    onToggleHide = { vm.setHideBalance(!data.hideBalance) },
+                )
                 1 -> CashFlowScreen(data = data, onAdd = vm::addTxn, onDelete = vm::deleteTxn)
                 2 -> CushionScreen(
                     data = data,

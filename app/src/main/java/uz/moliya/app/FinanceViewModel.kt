@@ -44,6 +44,9 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    // Balansni yashirish
+    fun setHideBalance(hide: Boolean) = update { it.copy(hideBalance = hide) }
+
     // Backup
     fun markBackup() = update { it.copy(lastBackup = System.currentTimeMillis()) }
 }

@@ -36,9 +36,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,65 +59,85 @@ fun DebtsScreen(
     var payFor by remember { mutableStateOf<Long?>(null) }
     var deleteTarget by remember { mutableStateOf<Debt?>(null) }
     var expandedId by remember { mutableStateOf<Long?>(null) }
+    // 0 = hammasi, 1 = olingan, 2 = berilgan
+    var filter by rememberSaveable { mutableStateOf(0) }
 
-    val totalAll = data.debts.sumOf { it.total }
-    val paidAll = data.debts.sumOf { it.paid }
-    val remainingAll = data.debtRemaining
-    val overall = if (totalAll > 0) (paidAll.toFloat() / totalAll.toFloat()).coerceIn(0f, 1f) else 0f
+    val owed = data.debtOwed
+    val lent = data.debtLent
+    val net = lent - owed
 
-    // Faol qarzlar yuqorida, yopilganlar pastda
-    val sorted = data.debts.sortedWith(compareBy<Debt> { it.remaining == 0L }.thenBy { it.dueDate.takeIf { d -> d > 0L } ?: Long.MAX_VALUE })
+    val shown = data.debts
+        .filter {
+            when (filter) {
+                1 -> !it.isLent
+                2 -> it.isLent
+                else -> true
+            }
+        }
+        .sortedWith(
+            compareBy<Debt> { it.remaining == 0L }
+                .thenBy { it.dueDate.takeIf { d -> d > 0L } ?: Long.MAX_VALUE },
+        )
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            item { ScreenHeader("Qarzlar nazorati", "Qarzlaringizni to'lab borishni kuzating") }
+            item { ScreenHeader("Qarzlar nazorati", "Olgan va bergan qarzlaringizni yozib boring") }
 
-            if (data.debts.isEmpty()) {
-                item {
-                    EmptyState(
-                        icon = Icons.Rounded.CreditCard,
-                        title = "Qarzlar yo'q",
-                        text = "Qarzingiz bo'lsa, \"Qarz qo'shish\" tugmasi orqali kiriting va to'lovlarni kuzating.",
-                    )
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    DebtTotalTile("Men qarzdorman", owed, Brand.expense, Modifier.weight(1f))
+                    DebtTotalTile("Menga qarzdor", lent, Brand.income, Modifier.weight(1f))
                 }
-            } else {
+            }
+
+            if (data.debts.isNotEmpty()) {
                 item {
-                    AppCard {
-                        Text(
-                            "Umumiy qoldiq",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            formatMoney(remainingAll),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (remainingAll > 0) Brand.expense else Brand.income,
-                        )
-                        Spacer(Modifier.height(14.dp))
-                        ProgressBar(progress = overall, color = Brand.primary)
-                        Spacer(Modifier.height(10.dp))
-                        Row {
+                    AppCard(padding = 16.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "To'langan: ${formatMoney(paidAll)}",
+                                "Sof holat",
                                 modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                             Text(
-                                "${(overall * 100).toInt()}%",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                (if (net > 0) "+" else "") + formatMoney(net),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = if (net >= 0) Brand.income else Brand.expense,
                             )
                         }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Menga qaytishi kerak bo'lgan pul minus men qaytarishim kerak bo'lgan pul.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
 
-                items(sorted, key = { it.id }) { debt ->
+                item {
+                    SegmentedToggle(
+                        options = listOf("Hammasi", "Olingan", "Berilgan"),
+                        selected = filter,
+                        onSelect = { filter = it },
+                    )
+                }
+            }
+
+            if (shown.isEmpty()) {
+                item {
+                    EmptyState(
+                        icon = Icons.Rounded.CreditCard,
+                        title = if (data.debts.isEmpty()) "Qarzlar yo'q" else "Bu bo'limda qarz yo'q",
+                        text = "\"Qarz qo'shish\" tugmasi orqali olgan yoki bergan qarzingizni kiriting va qaytarilishini kuzating.",
+                    )
+                }
+            } else {
+                items(shown, key = { it.id }) { debt ->
                     DebtCard(
                         debt = debt,
                         expanded = expandedId == debt.id,
@@ -141,7 +163,11 @@ fun DebtsScreen(
     }
 
     if (showAdd) {
-        AddDebtSheet(onDismiss = { showAdd = false }, onSave = onAddDebt)
+        AddDebtSheet(
+            startAsLent = filter == 2,
+            onDismiss = { showAdd = false },
+            onSave = onAddDebt,
+        )
     }
 
     val payId = payFor
@@ -170,6 +196,26 @@ fun DebtsScreen(
 }
 
 @Composable
+private fun DebtTotalTile(label: String, value: Long, color: Color, modifier: Modifier = Modifier) {
+    AppCard(modifier = modifier, padding = 16.dp) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            formatMoney(value),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
 private fun DebtCard(
     debt: Debt,
     expanded: Boolean,
@@ -180,17 +226,25 @@ private fun DebtCard(
 ) {
     val closed = debt.remaining == 0L
     val overdue = !closed && debt.dueDate > 0L && debt.dueDate < System.currentTimeMillis()
+    val typeColor = if (debt.isLent) Brand.income else Brand.expense
+    val paidWord = if (debt.isLent) "Qaytarilgan" else "To'langan"
 
     AppCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                debt.name,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    debt.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(6.dp))
+                StatusPill(
+                    if (debt.isLent) "Berilgan qarz" else "Olingan qarz",
+                    typeColor,
+                )
+            }
             IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                 Icon(
                     Icons.Rounded.Delete,
@@ -199,9 +253,9 @@ private fun DebtCard(
                 )
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
-            "Qoldiq",
+            if (debt.isLent) "Sizga qaytarilishi kerak" else "Siz qaytarishingiz kerak",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -216,7 +270,7 @@ private fun DebtCard(
         Spacer(Modifier.height(8.dp))
         Row {
             Text(
-                "To'langan: ${formatMoney(debt.paid)}",
+                "$paidWord: ${formatMoney(debt.paid)}",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -230,7 +284,7 @@ private fun DebtCard(
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (closed) StatusPill("To'langan", Brand.income)
+            if (closed) StatusPill(if (debt.isLent) "Qaytarilgan" else "To'langan", Brand.income)
             if (overdue) StatusPill("Muddati o'tgan", Brand.expense)
             if (!closed && !overdue && debt.dueDate > 0L) {
                 StatusPill("Muddat: ${Dates.format(debt.dueDate)}", Brand.muted)
@@ -241,7 +295,7 @@ private fun DebtCard(
         if (!closed) {
             Spacer(Modifier.height(16.dp))
             BigButton(
-                text = "To'lov qo'shish",
+                text = if (debt.isLent) "Qaytgan pulni qo'shish" else "To'lov qo'shish",
                 icon = Icons.Rounded.Add,
                 onClick = onPay,
                 modifier = Modifier.fillMaxWidth(),
@@ -256,7 +310,10 @@ private fun DebtCard(
                     .fillMaxWidth()
                     .heightIn(min = 48.dp),
             ) {
-                Text("To'lovlar tarixi (${debt.payments.size})", fontWeight = FontWeight.SemiBold)
+                Text(
+                    (if (debt.isLent) "Qaytarishlar tarixi" else "To'lovlar tarixi") + " (${debt.payments.size})",
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Spacer(Modifier.width(4.dp))
                 Icon(
                     if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
@@ -287,7 +344,7 @@ private fun DebtCard(
                         IconButton(onClick = { onDeletePayment(payment.id) }, modifier = Modifier.size(44.dp)) {
                             Icon(
                                 Icons.Rounded.Delete,
-                                contentDescription = "To'lovni o'chirish",
+                                contentDescription = "Yozuvni o'chirish",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(20.dp),
                             )
@@ -300,7 +357,8 @@ private fun DebtCard(
 }
 
 @Composable
-private fun AddDebtSheet(onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
+private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
+    var isLent by remember { mutableStateOf(startAsLent) }
     var name by remember { mutableStateOf("") }
     var total by remember { mutableStateOf("") }
     var alreadyPaid by remember { mutableStateOf("") }
@@ -314,20 +372,27 @@ private fun AddDebtSheet(onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
     val canSave = name.isNotBlank() && totalValue > 0 && !paidTooMuch
 
     FormSheet(title = "Yangi qarz", onDismiss = onDismiss) {
+        SegmentedToggle(
+            options = listOf("Olgan qarzim", "Bergan qarzim"),
+            selected = if (isLent) 1 else 0,
+            onSelect = { isLent = it == 1 },
+        )
         OutlinedTextField(
             value = name,
             onValueChange = { name = it.take(40) },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Qarz nomi (masalan: Bank krediti)") },
+            label = {
+                Text(if (isLent) "Kimga bergansiz? (ism)" else "Kimdan olgansiz? (ism yoki bank)")
+            },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
             shape = RoundedCornerShape(14.dp),
         )
-        MoneyField(value = total, onChange = { total = it }, label = "Umumiy qarz summasi")
+        MoneyField(value = total, onChange = { total = it }, label = "Qarz summasi")
         MoneyField(
             value = alreadyPaid,
             onChange = { alreadyPaid = it },
-            label = "Allaqachon to'langan (ixtiyoriy)",
+            label = if (isLent) "Allaqachon qaytarilgan (ixtiyoriy)" else "Allaqachon to'langan (ixtiyoriy)",
             isError = paidTooMuch,
             errorText = "Umumiy summadan ko'p bo'lmasligi kerak",
         )
@@ -349,7 +414,7 @@ private fun AddDebtSheet(onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "To'lov muddati bor",
+                "Qaytarish muddati bor",
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyLarge,
             )
@@ -376,6 +441,7 @@ private fun AddDebtSheet(onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
                         interest = parseDecimal(interest),
                         dueDate = if (hasDue) due else 0L,
                         payments = payments,
+                        isLent = isLent,
                     ),
                 )
                 onDismiss()
@@ -391,7 +457,10 @@ private fun PaymentSheet(debt: Debt, onDismiss: () -> Unit, onSave: (DebtPayment
     val value = parseMoney(amount)
     val tooMuch = value > debt.remaining
 
-    FormSheet(title = "To'lov qo'shish", onDismiss = onDismiss) {
+    FormSheet(
+        title = if (debt.isLent) "Qaytgan pulni qo'shish" else "To'lov qo'shish",
+        onDismiss = onDismiss,
+    ) {
         Text(
             "${debt.name}. Qoldiq: ${formatMoney(debt.remaining)}",
             style = MaterialTheme.typography.bodyMedium,
@@ -400,7 +469,7 @@ private fun PaymentSheet(debt: Debt, onDismiss: () -> Unit, onSave: (DebtPayment
         MoneyField(
             value = amount,
             onChange = { amount = it },
-            label = "To'lov summasi",
+            label = if (debt.isLent) "Qaytgan summa" else "To'lov summasi",
             isError = tooMuch,
             errorText = "Qoldiqdan ko'p bo'lmasligi kerak",
         )

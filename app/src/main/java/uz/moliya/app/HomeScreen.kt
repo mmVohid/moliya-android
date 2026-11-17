@@ -18,13 +18,20 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,14 +43,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
+fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit, onToggleHide: () -> Unit) {
     val start = Dates.monthStart(0)
     val end = Dates.monthStart(1)
     val income = data.income(start, end)
     val expense = data.expense(start, end)
     val balance = income - expense
 
-    val offsets = (-5..0).toList()
+    val offsets = (-11..0).toList()
     val incomes = offsets.map { data.income(Dates.monthStart(it), Dates.monthStart(it + 1)) }
     val expenses = offsets.map { data.expense(Dates.monthStart(it), Dates.monthStart(it + 1)) }
     val labels = offsets.map { Dates.shortMonth(it) }
@@ -64,7 +71,15 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
     ) {
         item { ScreenHeader("Moliya", Dates.monthLabel(0)) }
 
-        item { HeroCard(balance = balance, income = income, expense = expense) }
+        item {
+            HeroCard(
+                balance = balance,
+                income = income,
+                expense = expense,
+                hidden = data.hideBalance,
+                onToggleHide = onToggleHide,
+            )
+        }
 
         if (staleBackup) {
             item {
@@ -103,7 +118,7 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
         item {
             AppCard {
                 Text(
-                    "Oxirgi 6 oy",
+                    "Oxirgi 12 oy",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -114,6 +129,12 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
                 }
                 Spacer(Modifier.height(16.dp))
                 DualBarChart(incomes, expenses, labels)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Oldingi oylarni ko'rish uchun grafikni chapga suring",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
 
@@ -145,48 +166,73 @@ fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
         }
 
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                CushionMini(data, Modifier.weight(1f)) { onOpenTab(2) }
-                DebtMini(data, Modifier.weight(1f)) { onOpenTab(3) }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CushionMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(2) }
+                DebtMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(3) }
             }
         }
     }
 }
 
 @Composable
-private fun HeroCard(balance: Long, income: Long, expense: Long) {
+private fun HeroCard(
+    balance: Long,
+    income: Long,
+    expense: Long,
+    hidden: Boolean,
+    onToggleHide: () -> Unit,
+) {
     Box(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(Brand.primary, Brand.primaryDark)))
-            .padding(24.dp),
+            .padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 24.dp),
     ) {
         Column {
-            Text(
-                "Oy balansi",
-                style = MaterialTheme.typography.titleSmall,
-                color = Color.White.copy(alpha = 0.85f),
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                formatMoney(balance),
-                fontSize = 32.sp,
-                lineHeight = 40.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                HeroStat("Daromad", income, Modifier.weight(1f))
-                HeroStat("Xarajat", expense, Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Oy balansi",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+                IconButton(onClick = onToggleHide, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        if (hidden) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility,
+                        contentDescription = if (hidden) "Balansni ko'rsatish" else "Balansni yashirish",
+                        tint = Color.White,
+                    )
+                }
+            }
+            Column(Modifier.padding(end = 12.dp)) {
+                Text(
+                    maskedMoney(balance, hidden),
+                    fontSize = 32.sp,
+                    lineHeight = 40.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroStat("Daromad", income, hidden, Modifier.weight(1f))
+                    HeroStat("Xarajat", expense, hidden, Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
+private fun maskedMoney(value: Long, hidden: Boolean): String =
+    if (hidden) "••••••• so'm" else formatMoney(value)
+
 @Composable
-private fun HeroStat(label: String, value: Long, modifier: Modifier = Modifier) {
+private fun HeroStat(label: String, value: Long, hidden: Boolean, modifier: Modifier = Modifier) {
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
@@ -196,7 +242,7 @@ private fun HeroStat(label: String, value: Long, modifier: Modifier = Modifier) 
         Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
         Spacer(Modifier.height(2.dp))
         Text(
-            formatMoney(value),
+            maskedMoney(value, hidden),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = Color.White,
@@ -227,16 +273,20 @@ private fun LegendDot(text: String, color: Color) {
 @Composable
 private fun DualBarChart(income: List<Long>, expense: List<Long>, labels: List<String>) {
     val maxValue = maxOf(1L, income.maxOrNull() ?: 0L, expense.maxOrNull() ?: 0L)
+    val scroll = rememberScrollState()
+    // Joriy oy (o'ngdagi) ko'rinib turishi uchun oxirigacha suramiz
+    LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
     Row(
         Modifier
             .fillMaxWidth()
+            .horizontalScroll(scroll)
             .height(170.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         labels.forEachIndexed { i, label ->
             Column(
                 Modifier
-                    .weight(1f)
+                    .width(40.dp)
                     .fillMaxHeight(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -311,7 +361,7 @@ private fun CushionMini(data: FinanceData, modifier: Modifier, onClick: () -> Un
     val target = data.cushionTarget
     val progress = if (target > 0) (data.cushionSaved.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f
     AppCard(modifier = modifier, onClick = onClick, padding = 16.dp) {
-        Icon(Icons.Rounded.Savings, contentDescription = null, tint = Brand.primary, modifier = Modifier.size(26.dp))
+        Icon(Icons.Rounded.Shield, contentDescription = null, tint = Brand.primary, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(10.dp))
         Text("Himoya yostig'i", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(2.dp))
@@ -333,24 +383,27 @@ private fun CushionMini(data: FinanceData, modifier: Modifier, onClick: () -> Un
 
 @Composable
 private fun DebtMini(data: FinanceData, modifier: Modifier, onClick: () -> Unit) {
-    val active = data.debts.count { it.remaining > 0 }
     AppCard(modifier = modifier, onClick = onClick, padding = 16.dp) {
-        Icon(Icons.Rounded.CreditCard, contentDescription = null, tint = Brand.expense, modifier = Modifier.size(26.dp))
+        Icon(Icons.Rounded.CreditCard, contentDescription = null, tint = Brand.primary, modifier = Modifier.size(26.dp))
         Spacer(Modifier.height(10.dp))
-        Text("Qarz qoldig'i", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(2.dp))
+        Text("Men qarzdorman", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            formatMoney(data.debtRemaining),
-            style = MaterialTheme.typography.titleLarge,
+            formatMoney(data.debtOwed),
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
+            color = Brand.expense,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(8.dp))
+        Text("Menga qarzdor", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
-            if (active == 0) "Faol qarz yo'q" else "$active ta faol qarz",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            formatMoney(data.debtLent),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Brand.income,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

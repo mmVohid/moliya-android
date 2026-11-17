@@ -42,6 +42,8 @@ data class Debt(
     /** 0 = muddat belgilanmagan */
     val dueDate: Long,
     val payments: List<DebtPayment>,
+    /** false = men olgan qarz (men qaytaraman), true = men bergan qarz (menga qaytarishadi) */
+    val isLent: Boolean = false,
 ) {
     val paid: Long get() = payments.sumOf { it.amount }
     val remaining: Long get() = (total - paid).coerceAtLeast(0L)
@@ -56,10 +58,16 @@ data class FinanceData(
     val targetMonths: Int = 6,
     val debts: List<Debt> = emptyList(),
     val lastBackup: Long = 0L,
+    val hideBalance: Boolean = false,
 ) {
     val cushionSaved: Long get() = cushion.sumOf { it.amount }.coerceAtLeast(0L)
     val cushionTarget: Long get() = monthlyNeed * targetMonths
-    val debtRemaining: Long get() = debts.sumOf { it.remaining }
+
+    /** Men qarzdorman (olingan qarzlar qoldig'i) */
+    val debtOwed: Long get() = debts.filter { !it.isLent }.sumOf { it.remaining }
+
+    /** Menga qarzdor (berilgan qarzlar qoldig'i) */
+    val debtLent: Long get() = debts.filter { it.isLent }.sumOf { it.remaining }
     val isEmpty: Boolean get() = txns.isEmpty() && cushion.isEmpty() && debts.isEmpty()
 
     fun income(start: Long, end: Long): Long =
@@ -238,6 +246,7 @@ object Storage {
         root.put("monthlyNeed", d.monthlyNeed)
         root.put("targetMonths", d.targetMonths)
         root.put("lastBackup", d.lastBackup)
+        root.put("hideBalance", d.hideBalance)
 
         val txns = JSONArray()
         for (t in d.txns) {
@@ -271,6 +280,7 @@ object Storage {
             o.put("total", debt.total)
             o.put("interest", debt.interest)
             o.put("dueDate", debt.dueDate)
+            o.put("lent", debt.isLent)
             val pays = JSONArray()
             for (p in debt.payments) {
                 val po = JSONObject()
@@ -321,6 +331,7 @@ object Storage {
                 total = d.getLong("total"),
                 interest = d.optDouble("interest", 0.0),
                 dueDate = d.optLong("dueDate", 0L),
+                isLent = d.optBoolean("lent", false),
                 payments = d.optJSONArray("payments").mapObjects { p ->
                     DebtPayment(
                         id = p.getLong("id"),
@@ -331,5 +342,6 @@ object Storage {
             )
         },
         lastBackup = o.optLong("lastBackup", 0L),
+        hideBalance = o.optBoolean("hideBalance", false),
     )
 }
