@@ -428,10 +428,10 @@ private fun TxnSheet(
         footer = saveButton,
     ) {
         SegmentedToggle(
-            options = listOf("Xarajat", "Daromad"),
-            selected = if (isIncome) 1 else 0,
+            options = listOf("Daromad", "Xarajat"),
+            selected = if (isIncome) 0 else 1,
             onSelect = {
-                isIncome = it == 1
+                isIncome = it == 0
                 category = ""
             },
         )
@@ -483,74 +483,6 @@ private fun TxnSheet(
         }
         if (receipt.isNotEmpty()) {
             TextButton(onClick = { receipt = "" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Rasmni olib tashlash") }
-        }
-
-        // 5. Kategoriya (ro'yxat + Yangi kategoriya)
-        var menuOpen by remember { mutableStateOf(false) }
-        var showNewCategory by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded = menuOpen, onExpandedChange = { menuOpen = it }) {
-            OutlinedTextField(
-                value = category,
-                onValueChange = {},
-                readOnly = true,
-                modifier = Modifier
-                    .menuAnchor()
-                    .fillMaxWidth(),
-                label = { Text("Kategoriya (ixtiyoriy)") },
-                placeholder = { Text(if (isIncome) "Boshqa (ixtiyoriy)" else "Boshqalar (ixtiyoriy)") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
-                shape = RoundedCornerShape(14.dp),
-            )
-            ExposedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                categories.forEach { c ->
-                    DropdownMenuItem(
-                        text = { Text(c, style = MaterialTheme.typography.bodyLarge) },
-                        onClick = {
-                            category = c
-                            menuOpen = false
-                        },
-                        modifier = Modifier.heightIn(min = 48.dp),
-                    )
-                }
-                HorizontalDivider()
-                DropdownMenuItem(
-                    text = {
-                        Text("+ Yangi kategoriya", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-                    },
-                    onClick = {
-                        menuOpen = false
-                        showNewCategory = true
-                    },
-                    modifier = Modifier.heightIn(min = 48.dp),
-                )
-            }
-        }
-        if (showNewCategory) {
-            var name by remember { mutableStateOf("") }
-            AlertDialog(
-                onDismissRequest = { showNewCategory = false },
-                title = { Text("Yangi kategoriya") },
-                text = {
-                    OutlinedTextField(
-                        value = name,
-                        onValueChange = { name = it.take(24) },
-                        label = { Text("Kategoriya nomi") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp),
-                    )
-                },
-                confirmButton = {
-                    TextButton(
-                        enabled = name.isNotBlank(),
-                        onClick = {
-                            onAddCategory(isIncome, name)
-                            category = name.trim()
-                            showNewCategory = false
-                        },
-                    ) { Text("Qo'shish") }
-                },
-                dismissButton = { TextButton(onClick = { showNewCategory = false }) { Text("Bekor qilish") } },
-            )
         }
     }
 }

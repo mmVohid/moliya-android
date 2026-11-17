@@ -523,20 +523,6 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
                 )
             }
         }
-        item {
-            AppCard {
-                Text("Bosh sahifa kartalari", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                cardNames.forEach { (bit, name) ->
-                    SwitchRow(
-                        title = name,
-                        subtitle = "",
-                        checked = s.homeCards and bit != 0,
-                        onChange = { on -> vm.setHomeCards(if (on) s.homeCards or bit else s.homeCards and bit.inv()) },
-                    )
-                }
-            }
-        }
     }
 }
 
