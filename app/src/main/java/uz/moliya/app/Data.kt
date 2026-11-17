@@ -213,13 +213,17 @@ object Recurrence {
 
 object Budget {
     /** Zarur toifasi; qolgan xarajatlar "xohish" hisoblanadi */
-    val needs = setOf("Oziq-ovqat", "Transport", "Uy-joy", "Aloqa", "Sog'liq", "Ta'lim", "Qarz to'lovi")
+    val needs = setOf(
+        "Do'konlar", "Transport", "Mobile aloqa", "Kommunal xizmatlar", "Ta'lim",
+        // eski yozuvlar uchun
+        "Oziq-ovqat", "Uy-joy", "Aloqa", "Sog'liq", "Qarz to'lovi",
+    )
 }
 
 object Categories {
     val expense = listOf(
-        "Oziq-ovqat", "Transport", "Uy-joy", "Aloqa", "Sog'liq",
-        "Ta'lim", "Ko'ngilochar", "Kiyim", "Qarz to'lovi", "Boshqa",
+        "Ta'lim", "Do'konlar", "Transport", "Mobile aloqa",
+        "Restoran va kofelar", "Kommunal xizmatlar", "Sayohat va mehmonxona", "Boshqalar",
     )
     val income = listOf("Oylik", "Qo'shimcha daromad", "Sovg'a", "Boshqa")
 }

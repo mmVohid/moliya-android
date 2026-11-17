@@ -33,7 +33,6 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Repeat
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.TrendingDown
@@ -85,7 +84,6 @@ fun CashFlowScreen(
     var showLimits by remember { mutableStateOf(false) }
     var offset by rememberSaveable { mutableStateOf(0) }
     var filter by rememberSaveable { mutableStateOf(0) }
-    var query by rememberSaveable { mutableStateOf("") }
     var showAdd by remember { mutableStateOf(false) }
     var addAsIncome by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<Txn?>(null) }
@@ -100,27 +98,16 @@ fun CashFlowScreen(
 
     val start = Dates.monthStart(offset)
     val end = Dates.monthStart(offset + 1)
-    val searching = query.isNotBlank()
-
-    val shown: List<Txn> = if (searching) {
-        val q = query.trim().lowercase(Locale.getDefault())
-        data.txns.filter { t ->
-            t.category.lowercase(Locale.getDefault()).contains(q) ||
-                t.note.lowercase(Locale.getDefault()).contains(q) ||
-                t.amount.toString().contains(q) ||
-                t.currency.lowercase(Locale.getDefault()).contains(q)
-        }
-    } else {
-        data.txns
-            .filter { it.date >= start && it.date < end }
-            .filter {
-                when (filter) {
-                    1 -> it.isIncome
-                    2 -> !it.isIncome
-                    else -> true
-                }
+    val shown: List<Txn> = data.txns
+        .filter { it.date >= start && it.date < end }
+        .filter {
+            when (filter) {
+                1 -> it.isIncome
+                2 -> !it.isIncome
+                else -> true
             }
-    }.sortedWith(compareByDescending<Txn> { it.date }.thenByDescending { it.id })
+        }
+        .sortedWith(compareByDescending<Txn> { it.date }.thenByDescending { it.id })
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
@@ -129,27 +116,7 @@ fun CashFlowScreen(
         ) {
             item { ScreenHeader("Daromad / Xarajat", "Pul oqimini kuzatib boring") }
 
-            item {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it.take(40) },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Qidirish: kategoriya, izoh, summa") },
-                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searching) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Rounded.Close, contentDescription = "Qidiruvni tozalash")
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    shape = RoundedCornerShape(16.dp),
-                )
-            }
-
-            if (!searching) {
+            run {
                 item {
                     MonthSwitcher(
                         label = Dates.monthLabel(offset),
@@ -190,23 +157,14 @@ fun CashFlowScreen(
                         onSelect = { filter = it },
                     )
                 }
-            } else {
-                item {
-                    Text(
-                        "Topildi: ${shown.size} ta",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
             }
 
             if (shown.isEmpty()) {
                 item {
                     EmptyState(
-                        icon = if (searching) Icons.Rounded.Search else Icons.Rounded.SwapVert,
-                        title = if (searching) "Hech narsa topilmadi" else "Yozuvlar yo'q",
-                        text = if (searching) "Boshqa so'z bilan qidirib ko'ring."
-                        else "Pastdagi \"Qo'shish\" tugmasi orqali birinchi daromad yoki xarajatni kiriting.",
+                        icon = Icons.Rounded.SwapVert,
+                        title = "Yozuvlar yo'q",
+                        text = "Pastdagi \"Qo'shish\" tugmasi orqali birinchi daromad yoki xarajatni kiriting.",
                     )
                 }
             } else {
