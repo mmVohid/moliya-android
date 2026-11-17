@@ -2,6 +2,7 @@
 
 package uz.moliya.app
 
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Share
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
@@ -146,6 +147,13 @@ internal fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Str
                         putExtra(Intent.EXTRA_TEXT, text)
                     }
                     context.startActivity(Intent.createChooser(send, "Moliya'ni ulashish").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+                Divider()
+                NavRow(Icons.Rounded.Star, Color(0xFFE5A100), "Qo'llab-quvvatlash", "GitHub \u2605") {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/mmVohid/moliya-android"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
                 }
                 Divider()
                 NavRow(Icons.Rounded.Info, Color(0xFF6B7280), "Ilova haqida", "v${BuildConfig.VERSION_NAME}") { onOpen("about") }
