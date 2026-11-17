@@ -18,6 +18,8 @@ data class AppSettings(
     val autoBackup: Boolean = false,
     val backupFolder: String = "",
     val lastAutoBackup: Long = 0L,
+    /** Skrinshot va oxirgi ilovalar ko'rinishini yashirish */
+    val secureScreen: Boolean = false,
 ) {
     val hasPin: Boolean get() = pinHash.isNotEmpty()
 }
@@ -36,6 +38,7 @@ object Prefs {
             autoBackup = sp.getBoolean("autoBackup", false),
             backupFolder = sp.getString("backupFolder", "") ?: "",
             lastAutoBackup = sp.getLong("lastAutoBackup", 0L),
+            secureScreen = sp.getBoolean("secureScreen", false),
         )
     }
 
@@ -49,6 +52,7 @@ object Prefs {
             .putBoolean("autoBackup", s.autoBackup)
             .putString("backupFolder", s.backupFolder)
             .putLong("lastAutoBackup", s.lastAutoBackup)
+            .putBoolean("secureScreen", s.secureScreen)
             .apply()
     }
 }

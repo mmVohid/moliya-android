@@ -3,6 +3,7 @@ package uz.moliya.app
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
+import android.view.WindowManager
 import android.os.SystemClock
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -69,6 +70,11 @@ class MainActivity : FragmentActivity() {
                 )
                 onDispose { }
             }
+            DisposableEffect(settings.secureScreen) {
+                if (settings.secureScreen) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                onDispose { }
+            }
             MoliyaTheme(dark = dark) {
                 if (vm.locked) {
                     LockScreen(
@@ -130,6 +136,8 @@ fun MoliyaApp(vm: FinanceViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showReport by rememberSaveable { mutableStateOf(false) }
+    var showNet by rememberSaveable { mutableStateOf(false) }
+    var showYear by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val data = vm.data
@@ -152,20 +160,32 @@ fun MoliyaApp(vm: FinanceViewModel) {
         }
     }
 
+    val undoableAction: (String, String, () -> Unit) -> Unit = { message, label, action ->
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar(message = message, actionLabel = label, duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) action()
+        }
+    }
+
     LaunchedEffect(vm.quickAdd) {
         if (vm.quickAdd != 0) {
             tab = 1
             showSettings = false
             showReport = false
+            showNet = false
+            showYear = false
         }
     }
 
-    BackHandler(enabled = showSettings || showReport) {
+    BackHandler(enabled = showSettings || showReport || showNet || showYear) {
         showSettings = false
         showReport = false
+        showNet = false
+        showYear = false
     }
 
-    if (showSettings || showReport) {
+    if (showSettings || showReport || showNet || showYear) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
@@ -182,10 +202,27 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onReminders = vm::setReminders,
                         onAutoBackup = vm::setAutoBackup,
                         onPickFolder = vm::setBackupFolder,
+                        onSecureScreen = vm::setSecureScreen,
                         onBack = { showSettings = false },
                     )
+                } else if (showReport) {
+                    ReportScreen(
+                        data = data,
+                        onBack = { showReport = false },
+                        onSaveReflection = vm::saveReflection,
+                        onSetBudget = vm::setBudget,
+                    )
+                } else if (showNet) {
+                    NetWorthScreen(
+                        data = data,
+                        hidden = data.hideBalance,
+                        onBack = { showNet = false },
+                        onAddWallet = vm::addWallet,
+                        onDeleteWallet = { vm.deleteWallet(it.id) },
+                        onTransfer = vm::addTransfer,
+                    )
                 } else {
-                    ReportScreen(data = data, onBack = { showReport = false })
+                    YearScreen(data = data, onBack = { showYear = false })
                 }
             }
         }
@@ -233,6 +270,8 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         vm.requestQuickAdd(income)
                     },
                     onOpenReport = { showReport = true },
+                    onOpenNetWorth = { showNet = true },
+                    onOpenYear = { showYear = true },
                 )
                 1 -> CashFlowScreen(
                     data = data,
@@ -242,6 +281,20 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         val before = data
                         vm.addTxn(txn)
                         warnIfOverLimit(before, txn, notify)
+                        if (txn.isIncome && before.saveRate > 0) {
+                            val part = txn.amount * before.saveRate / 100
+                            if (part > 0 && (before.monthlyNeed > 0 || before.goals.isNotEmpty())) {
+                                undoableAction(
+                                    "Jamg'armaga ${formatMoney(part)} ajrating (${before.saveRate}%)",
+                                    "Ajratish",
+                                ) {
+                                    val entry = CushionEntry(Ids.next(), part, "Daromaddan ajratma", Dates.today())
+                                    val goal = before.goals.firstOrNull { it.remaining > 0 }
+                                    if (before.monthlyNeed > 0) vm.addCushion(entry)
+                                    else if (goal != null) vm.addGoalEntry(goal.id, entry)
+                                }
+                            }
+                        }
                     },
                     onUpdate = vm::updateTxn,
                     onDelete = { txn ->
@@ -253,6 +306,7 @@ fun MoliyaApp(vm: FinanceViewModel) {
                     onSaveLimits = vm::setLimits,
                     onAddTemplate = vm::addTemplate,
                     onDeleteTemplate = vm::deleteTemplate,
+                    onAddCategory = vm::addCategory,
                 )
                 2 -> SavingsHost(
                     data = data,

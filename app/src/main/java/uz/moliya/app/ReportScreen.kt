@@ -17,6 +17,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.remember
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +35,14 @@ import androidx.compose.ui.unit.dp
 import java.util.Calendar
 
 @Composable
-fun ReportScreen(data: FinanceData, onBack: () -> Unit) {
+fun ReportScreen(
+    data: FinanceData,
+    onBack: () -> Unit,
+    onSaveReflection: (Reflection) -> Unit,
+    onSetBudget: (Int, Int, Int) -> Unit,
+) {
+    var showBudget by remember { mutableStateOf(false) }
+    var showReflection by remember { mutableStateOf(false) }
     var offset by rememberSaveable { mutableStateOf(0) }
     val start = Dates.monthStart(offset)
     val end = Dates.monthStart(offset + 1)
@@ -84,6 +97,14 @@ fun ReportScreen(data: FinanceData, onBack: () -> Unit) {
     val breaches = data.limits.filter { (c, l) -> (byCat.firstOrNull { it.first == c }?.second ?: 0L) > l }
     if (breaches.isNotEmpty()) insights.add("Limitdan oshgan kategoriyalar: ${breaches.keys.joinToString(", ")}.")
     if (monthTxns.isEmpty()) insights.add("Bu oyda yozuv yo'q.")
+
+    if (showBudget) {
+        BudgetSheet(data.budgetNeeds, data.budgetWants, data.saveRate, onSetBudget) { showBudget = false }
+    }
+    if (showReflection) {
+        val key = Dates.monthKey(start)
+        ReflectionSheet(data.reflections.firstOrNull { it.monthKey == key }, key, onSaveReflection) { showReflection = false }
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
@@ -190,6 +211,65 @@ fun ReportScreen(data: FinanceData, onBack: () -> Unit) {
                 }
             }
         }
+        item {
+            val needsSpent = byCat.filter { it.first in Budget.needs }.sumOf { it.second }
+            val wantsSpent = expense - needsSpent
+            val saveSpent = Math.max(0L, remainder)
+            val savePct = 100 - data.budgetNeeds - data.budgetWants
+            AppCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Byudjet ${data.budgetNeeds}/${data.budgetWants}/$savePct",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    TextButton(onClick = { showBudget = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Sozlash") }
+                }
+                if (income <= 0L) {
+                    Text(
+                        "Byudjet daromadga nisbatan hisoblanadi. Bu oy daromad kiritilmagan.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Spacer(Modifier.height(8.dp))
+                    BudgetLine("Zarur", needsSpent, income * data.budgetNeeds / 100, true)
+                    Spacer(Modifier.height(12.dp))
+                    BudgetLine("Xohish", wantsSpent, income * data.budgetWants / 100, true)
+                    Spacer(Modifier.height(12.dp))
+                    BudgetLine("Jamg'arma", saveSpent, income * savePct / 100, false)
+                }
+            }
+        }
+        item {
+            val key = Dates.monthKey(start)
+            val refl = data.reflections.firstOrNull { it.monthKey == key }
+            AppCard {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Oy refleksiyasi",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    TextButton(onClick = { showReflection = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (refl == null) "Yozish" else "Tahrirlash")
+                    }
+                }
+                if (refl == null) {
+                    Text(
+                        "3 ta qisqa savolga javob bering. Bu odatlaringizni anglashga yordam beradi.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    ReflectionLine("Eng keraksiz xarajat", refl.wasteful)
+                    ReflectionLine("Yaxshilaganim", refl.improved)
+                    ReflectionLine("Keyingi oy maqsadi", refl.nextGoal)
+                }
+            }
+        }
         if (insights.isNotEmpty()) {
             item {
                 AppCard(containerColor = MaterialTheme.colorScheme.primaryContainer) {
@@ -206,6 +286,82 @@ fun ReportScreen(data: FinanceData, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun BudgetLine(label: String, actual: Long, plan: Long, limit: Boolean) {
+    val over = limit && actual > plan
+    val color = if (limit) { if (over) Brand.expense else Brand.primary } else { if (actual >= plan) Brand.income else Brand.warning }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        Text(
+            "${formatMoney(actual)} / ${formatMoney(plan)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = color,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+    Spacer(Modifier.height(6.dp))
+    ProgressBar(progress = if (plan > 0) actual.toFloat() / plan.toFloat() else 0f, color = color, height = 6.dp)
+}
+
+@Composable
+private fun ReflectionLine(title: String, text: String) {
+    if (text.isBlank()) return
+    Spacer(Modifier.height(8.dp))
+    Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, style = MaterialTheme.typography.bodyMedium)
+}
+
+@Composable
+internal fun BudgetSheet(needs: Int, wants: Int, saveRate: Int, onSave: (Int, Int, Int) -> Unit, onDismiss: () -> Unit) {
+    var n by remember { mutableStateOf(needs.toFloat()) }
+    var w by remember { mutableStateOf(wants.toFloat()) }
+    var r by remember { mutableStateOf(saveRate.toFloat()) }
+    val save = 100 - n.toInt() - w.toInt()
+    FormSheet(title = "Byudjet sozlamalari", onDismiss = onDismiss) {
+        Text("Zarur xarajatlar: ${n.toInt()}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Slider(value = n, onValueChange = { n = it.coerceAtMost(100f - w) }, valueRange = 0f..100f, steps = 19)
+        Text("Xohishlar: ${w.toInt()}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Slider(value = w, onValueChange = { w = it.coerceAtMost(100f - n) }, valueRange = 0f..100f, steps = 19)
+        Text("Jamg'arma: $save%", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Brand.primary)
+        Text(
+            "O'zingizga birinchi to'lang: daromad kiritganda jamg'armaga ajratish taklifi: " +
+                if (r.toInt() == 0) "o'chiq" else "${r.toInt()}%",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Slider(value = r, onValueChange = { r = it }, valueRange = 0f..50f, steps = 9)
+        BigButton(
+            text = "Saqlash",
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                onSave(n.toInt(), w.toInt(), r.toInt())
+                onDismiss()
+            },
+        )
+    }
+}
+
+@Composable
+private fun ReflectionSheet(existing: Reflection?, monthKey: String, onSave: (Reflection) -> Unit, onDismiss: () -> Unit) {
+    var a by remember { mutableStateOf(existing?.wasteful ?: "") }
+    var b by remember { mutableStateOf(existing?.improved ?: "") }
+    var c by remember { mutableStateOf(existing?.nextGoal ?: "") }
+    FormSheet(title = "Oy refleksiyasi", onDismiss = onDismiss) {
+        OutlinedTextField(value = a, onValueChange = { a = it.take(200) }, modifier = Modifier.fillMaxWidth(), label = { Text("Eng keraksiz xarajatim nima edi?") }, minLines = 2, shape = RoundedCornerShape(14.dp))
+        OutlinedTextField(value = b, onValueChange = { b = it.take(200) }, modifier = Modifier.fillMaxWidth(), label = { Text("Bu oy nimani yaxshiladim?") }, minLines = 2, shape = RoundedCornerShape(14.dp))
+        OutlinedTextField(value = c, onValueChange = { c = it.take(200) }, modifier = Modifier.fillMaxWidth(), label = { Text("Keyingi oy asosiy maqsadim?") }, minLines = 2, shape = RoundedCornerShape(14.dp))
+        BigButton(
+            text = "Saqlash",
+            enabled = a.isNotBlank() || b.isNotBlank() || c.isNotBlank(),
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                onSave(Reflection(existing?.id ?: Ids.next(), monthKey, a.trim(), b.trim(), c.trim()))
+                onDismiss()
+            },
+        )
     }
 }
 

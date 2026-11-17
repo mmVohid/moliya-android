@@ -18,7 +18,7 @@ object XlsxImporter {
 
     private val KNOWN_SHEETS = setOf(
         "Daromad-Xarajat", "Himoya yostigi", "Qarzlar", "Qarz tolovlari", "Limitlar", "Takroriy", "Xulosa",
-        "Shablonlar", "Maqsadlar", "Maqsad yozuvlari",
+        "Shablonlar", "Maqsadlar", "Maqsad yozuvlari", "Refleksiya", "Byudjet", "Hamyonlar", "Otkazmalar", "Kategoriyalar",
     )
 
     fun read(input: InputStream): FinanceData {
@@ -59,6 +59,9 @@ object XlsxImporter {
             throw ImportException("Bu Moliya zaxira fayli emas. Ilovadan \"Excelga yuklab olish\" orqali olingan faylni tanlang.")
         }
 
+        val wallets = sheets["Hamyonlar"].dataRows().mapNotNull { r ->
+            if (r.col(0).isEmpty()) null else Wallet(Ids.next(), r.col(0), num(r.col(1)))
+        }
         val txns = sheets["Daromad-Xarajat"].dataRows().mapNotNull { r ->
             val amount = num(r.col(3))
             if (amount <= 0L) {
@@ -74,6 +77,7 @@ object XlsxImporter {
                     currency = r.col(5).ifEmpty { "UZS" },
                     foreignAmount = r.col(6).replace(',', '.').toDoubleOrNull() ?: 0.0,
                     rate = r.col(7).replace(',', '.').toDoubleOrNull() ?: 0.0,
+                    walletId = wallets.firstOrNull { w -> w.name == r.col(8) }?.id ?: 0L,
                 )
             }
         }
@@ -204,6 +208,27 @@ object XlsxImporter {
             )
         }
 
+        val transfers = sheets["Otkazmalar"].dataRows().mapNotNull { r ->
+            val from = wallets.firstOrNull { it.name == r.col(1) }
+            val to = wallets.firstOrNull { it.name == r.col(2) }
+            val amount = num(r.col(3))
+            if (from == null || to == null || amount <= 0L) null
+            else Transfer(Ids.next(), from.id, to.id, amount, date(r.col(0)))
+        }
+        val customExpense = ArrayList<String>()
+        val customIncome = ArrayList<String>()
+        for (r in sheets["Kategoriyalar"].dataRows()) {
+            val name = r.col(1)
+            if (name.isEmpty()) continue
+            if (r.col(0).equals("Daromad", true)) customIncome.add(name) else customExpense.add(name)
+        }
+        val reflections = sheets["Refleksiya"].dataRows().mapNotNull { r ->
+            if (r.col(0).isEmpty()) null
+            else Reflection(Ids.next(), r.col(0), r.col(1), r.col(2), r.col(3))
+        }
+        val budget = HashMap<String, Int>()
+        for (r in sheets["Byudjet"].dataRows()) budget[r.col(0)] = num(r.col(1)).toInt()
+
         return FinanceData(
             txns = txns,
             cushion = cushion,
@@ -214,6 +239,14 @@ object XlsxImporter {
             recurring = recurring,
             templates = templates,
             goals = goals,
+            reflections = reflections,
+            budgetNeeds = budget["Zarur %"] ?: 50,
+            budgetWants = budget["Xohish %"] ?: 30,
+            saveRate = budget["Jamg'arma taklifi %"] ?: 0,
+            wallets = wallets,
+            transfers = transfers,
+            customExpense = customExpense,
+            customIncome = customIncome,
         )
     }
 

@@ -50,6 +50,7 @@ fun SettingsScreen(
     onReminders: (Boolean) -> Unit,
     onAutoBackup: (Boolean) -> Unit,
     onPickFolder: (String) -> Unit,
+    onSecureScreen: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -163,6 +164,19 @@ fun SettingsScreen(
                     options = listOf("Tizim", "Yorug'", "Qorong'i"),
                     selected = settings.theme,
                     onSelect = onTheme,
+                )
+            }
+        }
+
+        item { SectionTitle("Maxfiylik") }
+        item {
+            AppCard {
+                SwitchRow(
+                    title = "Ekranni himoyalash",
+                    subtitle = "Skrinshot olishni va \"oxirgi ilovalar\" ro'yxatida ko'rinishni bloklaydi",
+                    checked = settings.secureScreen,
+                    enabled = true,
+                    onChange = onSecureScreen,
                 )
             }
         }

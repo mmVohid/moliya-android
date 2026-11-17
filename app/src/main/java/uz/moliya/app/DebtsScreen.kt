@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Route
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -56,6 +57,7 @@ fun DebtsScreen(
     onDeletePayment: (Long, DebtPayment) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
+    var showStrategy by remember { mutableStateOf(false) }
     var payFor by remember { mutableStateOf<Long?>(null) }
     var deleteTarget by remember { mutableStateOf<Debt?>(null) }
     var expandedId by remember { mutableStateOf<Long?>(null) }
@@ -85,6 +87,17 @@ fun DebtsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { ScreenHeader("Qarzlar nazorati", "Olgan va bergan qarzlaringizni yozib boring") }
+
+            if (data.debts.count { !it.isLent && it.remaining > 0 } >= 2) {
+                item {
+                    OutlineBigButton(
+                        text = "Qarzni yopish rejasi",
+                        icon = Icons.Rounded.Route,
+                        onClick = { showStrategy = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
 
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -179,6 +192,8 @@ fun DebtsScreen(
             onSave = { payment -> onPay(payDebt.id, payment) },
         )
     }
+
+    if (showStrategy) DebtStrategySheet(debts = data.debts, onDismiss = { showStrategy = false })
 
     val del = deleteTarget
     if (del != null) {

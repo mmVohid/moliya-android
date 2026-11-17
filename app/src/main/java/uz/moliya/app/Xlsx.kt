@@ -31,6 +31,11 @@ object XlsxExporter {
             templateSheet(data),
             goalSheet(data),
             goalEntrySheet(data),
+            reflectionSheet(data),
+            budgetSheet(data),
+            walletSheet(data),
+            transferSheet(data),
+            categorySheet(data),
         )
         ZipOutputStream(BufferedOutputStream(out)).use { zip ->
             zip.entry("[Content_Types].xml", contentTypes(sheets.size))
@@ -87,7 +92,7 @@ object XlsxExporter {
 
     private fun txnSheet(d: FinanceData): Sheet {
         val rows = mutableListOf<List<Any>>(
-            listOf("Sana", "Turi", "Kategoriya", "Summa (so'm)", "Izoh", "Valyuta", "Valyuta summasi", "Kurs"),
+            listOf("Sana", "Turi", "Kategoriya", "Summa (so'm)", "Izoh", "Valyuta", "Valyuta summasi", "Kurs", "Hamyon"),
         )
         for (t in d.txns.sortedWith(compareBy<Txn> { it.date }.thenBy { it.id })) {
             val foreign = t.currency != "UZS"
@@ -101,10 +106,11 @@ object XlsxExporter {
                     t.currency,
                     if (foreign) t.foreignAmount else "",
                     if (foreign) t.rate else "",
+                    d.wallets.firstOrNull { it.id == t.walletId }?.name ?: "",
                 ),
             )
         }
-        return Sheet("Daromad-Xarajat", listOf(14, 12, 22, 18, 40, 10, 18, 12), rows)
+        return Sheet("Daromad-Xarajat", listOf(14, 12, 22, 18, 40, 10, 18, 12, 18), rows)
     }
 
     private fun cushionSheet(d: FinanceData): Sheet {
@@ -216,6 +222,52 @@ object XlsxExporter {
             }
         }
         return Sheet("Maqsad yozuvlari", listOf(26, 14, 14, 18, 30), rows)
+    }
+
+    private fun reflectionSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(
+            listOf("Oy", "Eng keraksiz xarajat", "Nimani yaxshiladim", "Keyingi oy maqsadi"),
+        )
+        for (r in d.reflections.sortedBy { it.monthKey }) rows.add(listOf(r.monthKey, r.wasteful, r.improved, r.nextGoal))
+        return Sheet("Refleksiya", listOf(12, 36, 36, 36), rows)
+    }
+
+    private fun walletSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Nomi", "Boshlang'ich qoldiq", "Joriy qoldiq"))
+        for (w in d.wallets) rows.add(listOf(w.name, w.opening, d.walletBalance(w)))
+        return Sheet("Hamyonlar", listOf(22, 20, 20), rows)
+    }
+
+    private fun transferSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Sana", "Qayerdan", "Qayerga", "Summa (so'm)"))
+        for (t in d.transfers.sortedBy { it.date }) {
+            rows.add(
+                listOf(
+                    Dates.iso(t.date),
+                    d.wallets.firstOrNull { it.id == t.fromId }?.name ?: "",
+                    d.wallets.firstOrNull { it.id == t.toId }?.name ?: "",
+                    t.amount,
+                ),
+            )
+        }
+        return Sheet("Otkazmalar", listOf(14, 22, 22, 18), rows)
+    }
+
+    private fun categorySheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Turi", "Nomi"))
+        d.customExpense.forEach { rows.add(listOf("Xarajat", it)) }
+        d.customIncome.forEach { rows.add(listOf("Daromad", it)) }
+        return Sheet("Kategoriyalar", listOf(12, 26), rows)
+    }
+
+    private fun budgetSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(
+            listOf("Parametr", "Qiymat"),
+            listOf("Zarur %", d.budgetNeeds),
+            listOf("Xohish %", d.budgetWants),
+            listOf("Jamg'arma taklifi %", d.saveRate),
+        )
+        return Sheet("Byudjet", listOf(26, 12), rows)
     }
 
     // ───── XML ─────

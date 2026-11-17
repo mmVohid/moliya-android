@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
+import androidx.compose.material.icons.rounded.Send
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material3.Icon
@@ -153,6 +154,16 @@ fun BackupScreen(
                     icon = Icons.Rounded.FileDownload,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { launcher.launch("moliya_${Dates.iso(System.currentTimeMillis())}.xlsx") },
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlineBigButton(
+                    text = "Claude'ga yuborish",
+                    icon = Icons.Rounded.Send,
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val error = ClaudeShare.share(context, data)
+                        if (error != null) notify(error) else onBackedUp()
+                    },
                 )
             }
         }

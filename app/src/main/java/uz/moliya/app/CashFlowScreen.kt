@@ -3,6 +3,12 @@
 package uz.moliya.app
 
 import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -73,6 +79,7 @@ fun CashFlowScreen(
     onSaveLimits: (Map<String, Long>) -> Unit,
     onAddTemplate: (Template) -> Unit,
     onDeleteTemplate: (Long) -> Unit,
+    onAddCategory: (Boolean, String) -> Unit,
 ) {
     var showRecurring by remember { mutableStateOf(false) }
     var showLimits by remember { mutableStateOf(false) }
@@ -237,6 +244,7 @@ fun CashFlowScreen(
             onSave = onAdd,
             onAddTemplate = onAddTemplate,
             onDeleteTemplate = onDeleteTemplate,
+            onAddCategory = onAddCategory,
         )
     }
 
@@ -250,12 +258,15 @@ fun CashFlowScreen(
             onSave = onUpdate,
             onAddTemplate = onAddTemplate,
             onDeleteTemplate = onDeleteTemplate,
+            onAddCategory = onAddCategory,
         )
     }
 
     if (showRecurring) {
         RecurringSheet(
             items = data.recurring,
+            expenseCats = data.expenseCategories,
+            incomeCats = data.incomeCategories,
             onAdd = onAddRecurring,
             onDelete = onDeleteRecurring,
             onDismiss = { showRecurring = false },
@@ -265,6 +276,7 @@ fun CashFlowScreen(
     if (showLimits) {
         LimitsSheet(
             limits = data.limits,
+            categories = data.expenseCategories,
             onSave = onSaveLimits,
             onDismiss = { showLimits = false },
         )
@@ -378,7 +390,9 @@ private fun TxnSheet(
     onSave: (Txn) -> Unit,
     onAddTemplate: (Template) -> Unit,
     onDeleteTemplate: (Long) -> Unit,
+    onAddCategory: (Boolean, String) -> Unit,
 ) {
+    val context = LocalContext.current
     var isIncome by remember { mutableStateOf(initial?.isIncome ?: startIncome) }
     var currency by remember { mutableStateOf(initial?.currency ?: "UZS") }
     var amount by remember {
@@ -395,10 +409,23 @@ private fun TxnSheet(
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var date by remember { mutableStateOf(initial?.date ?: Dates.today()) }
     var saveAsTemplate by remember { mutableStateOf(false) }
+    var walletId by remember { mutableStateOf(initial?.walletId ?: 0L) }
+    var receipt by remember { mutableStateOf(initial?.receipt ?: "") }
+    var newCategory by remember { mutableStateOf<String?>(null) }
+    var cameraTarget by remember { mutableStateOf<Pair<java.io.File, android.net.Uri>?>(null) }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) Receipts.save(context, uri)?.let { receipt = it }
+    }
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        val target = cameraTarget
+        if (ok && target != null) Receipts.save(context, target.second)?.let { receipt = it }
+        target?.first?.delete()
+        cameraTarget = null
+    }
     var manageTemplates by remember { mutableStateOf(false) }
 
     val foreign = currency != "UZS"
-    val categories = if (isIncome) Categories.income else Categories.expense
+    val categories = if (isIncome) data.incomeCategories else data.expenseCategories
     val amountUzs: Long = if (foreign) {
         (parseDecimal(amount) * parseDecimal(rate)).roundToLong()
     } else {
@@ -506,8 +533,80 @@ private fun TxnSheet(
 
         Text("Kategoriya", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         CategoryChips(categories = categories, selected = category, onSelect = { category = it })
+        val adding = newCategory
+        if (adding == null) {
+            TextButton(onClick = { newCategory = "" }, modifier = Modifier.heightIn(min = 48.dp)) {
+                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Yangi kategoriya")
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = adding,
+                    onValueChange = { newCategory = it.take(20) },
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Kategoriya nomi") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                )
+                TextButton(
+                    enabled = adding.isNotBlank(),
+                    onClick = {
+                        onAddCategory(isIncome, adding)
+                        category = adding.trim()
+                        newCategory = null
+                    },
+                    modifier = Modifier.heightIn(min = 48.dp),
+                ) { Text("Qo'shish") }
+            }
+        }
+        if (data.wallets.isNotEmpty()) {
+            Text("Hamyon", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = walletId == 0L, onClick = { walletId = 0L }, label = { Text("Belgilanmagan") }, modifier = Modifier.heightIn(min = 40.dp))
+                data.wallets.forEach { w ->
+                    FilterChip(selected = walletId == w.id, onClick = { walletId = w.id }, label = { Text(w.name) }, modifier = Modifier.heightIn(min = 40.dp))
+                }
+            }
+        }
         NoteField(value = note, onChange = { note = it })
         DateField(millis = date, onChange = { date = it })
+
+        Text("Chek rasmi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        val preview = remember(receipt) { Receipts.load(context, receipt) }
+        if (preview != null) {
+            androidx.compose.foundation.Image(
+                bitmap = preview,
+                contentDescription = "Chek rasmi",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .clip(RoundedCornerShape(14.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlineBigButton(
+                text = "Kamera",
+                icon = Icons.Rounded.PhotoCamera,
+                onClick = {
+                    val target = Receipts.cameraTarget(context)
+                    cameraTarget = target
+                    camera.launch(target.second)
+                },
+                modifier = Modifier.weight(1f),
+            )
+            OutlineBigButton(
+                text = "Galereya",
+                icon = Icons.Rounded.Image,
+                onClick = { gallery.launch("image/*") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (receipt.isNotEmpty()) {
+            TextButton(onClick = { receipt = "" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Rasmni olib tashlash") }
+        }
 
         if (initial == null && !foreign) {
             Row(
@@ -542,6 +641,8 @@ private fun TxnSheet(
                         currency = currency,
                         foreignAmount = if (foreign) parseDecimal(amount) else 0.0,
                         rate = if (foreign) parseDecimal(rate) else 0.0,
+                        walletId = walletId,
+                        receipt = receipt,
                     ),
                 )
                 if (initial == null && saveAsTemplate && !foreign) {

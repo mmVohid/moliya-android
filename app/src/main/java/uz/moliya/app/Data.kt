@@ -23,6 +23,10 @@ data class Txn(
     val foreignAmount: Double = 0.0,
     /** 1 birlik valyuta necha so'm (yozuv paytidagi kurs) */
     val rate: Double = 0.0,
+    /** 0 = hamyon belgilanmagan */
+    val walletId: Long = 0L,
+    /** Chek rasmi fayl nomi (ilova xotirasida); Excelga kirmaydi */
+    val receipt: String = "",
 )
 
 /** amount > 0: yostiqqa qo'shildi, amount < 0: yostiqdan yechildi */
@@ -55,6 +59,19 @@ data class Debt(
     val progress: Float
         get() = if (total <= 0L) 0f else (paid.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }
+
+data class Wallet(val id: Long, val name: String, val opening: Long)
+
+data class Transfer(val id: Long, val fromId: Long, val toId: Long, val amount: Long, val date: Long)
+
+/** Oylik refleksiya: 3 ta savolga javob. monthKey = "2026-11" */
+data class Reflection(
+    val id: Long,
+    val monthKey: String,
+    val wasteful: String,
+    val improved: String,
+    val nextGoal: String,
+)
 
 /** Tez-tez takrorlanadigan xarajat/daromad shabloni */
 data class Template(
@@ -111,7 +128,27 @@ data class FinanceData(
     val recurring: List<Recurring> = emptyList(),
     val templates: List<Template> = emptyList(),
     val goals: List<Goal> = emptyList(),
+    val reflections: List<Reflection> = emptyList(),
+    /** Byudjet: zarur %, xohish %, qolgani jamg'arma. */
+    val budgetNeeds: Int = 50,
+    val budgetWants: Int = 30,
+    /** Daromad kiritilganda jamg'armaga taklif qilinadigan foiz (0 = o'chiq) */
+    val saveRate: Int = 0,
+    val wallets: List<Wallet> = emptyList(),
+    val transfers: List<Transfer> = emptyList(),
+    val customExpense: List<String> = emptyList(),
+    val customIncome: List<String> = emptyList(),
 ) {
+    val expenseCategories: List<String> get() = Categories.expense + customExpense
+    val incomeCategories: List<String> get() = Categories.income + customIncome
+
+    fun walletBalance(w: Wallet): Long {
+        val flow = txns.filter { it.walletId == w.id }.sumOf { if (it.isIncome) it.amount else -it.amount }
+        val tin = transfers.filter { it.toId == w.id }.sumOf { it.amount }
+        val tout = transfers.filter { it.fromId == w.id }.sumOf { it.amount }
+        return w.opening + flow + tin - tout
+    }
+
     val cushionSaved: Long get() = cushion.sumOf { it.amount }.coerceAtLeast(0L)
     val cushionTarget: Long get() = monthlyNeed * targetMonths
 
@@ -172,6 +209,11 @@ object Recurrence {
         }
         return if (changed) d.copy(txns = d.txns + created, recurring = updated) else d
     }
+}
+
+object Budget {
+    /** Zarur toifasi; qolgan xarajatlar "xohish" hisoblanadi */
+    val needs = setOf("Oziq-ovqat", "Transport", "Uy-joy", "Aloqa", "Sog'liq", "Ta'lim", "Qarz to'lovi")
 }
 
 object Categories {
@@ -423,6 +465,39 @@ object Storage {
         }
         root.put("goals", goals)
 
+        val refl = JSONArray()
+        for (r in d.reflections) {
+            val o = JSONObject()
+            o.put("id", r.id)
+            o.put("month", r.monthKey)
+            o.put("a", r.wasteful)
+            o.put("b", r.improved)
+            o.put("c", r.nextGoal)
+            refl.put(o)
+        }
+        root.put("reflections", refl)
+        root.put("bNeeds", d.budgetNeeds)
+        root.put("bWants", d.budgetWants)
+        root.put("saveRate", d.saveRate)
+
+        val wallets = JSONArray()
+        for (w in d.wallets) {
+            val o = JSONObject()
+            o.put("id", w.id); o.put("name", w.name); o.put("opening", w.opening)
+            wallets.put(o)
+        }
+        root.put("wallets", wallets)
+        val transfers = JSONArray()
+        for (t in d.transfers) {
+            val o = JSONObject()
+            o.put("id", t.id); o.put("from", t.fromId); o.put("to", t.toId)
+            o.put("amount", t.amount); o.put("date", t.date)
+            transfers.put(o)
+        }
+        root.put("transfers", transfers)
+        root.put("cEx", JSONArray(d.customExpense))
+        root.put("cIn", JSONArray(d.customIncome))
+
         val txns = JSONArray()
         for (t in d.txns) {
             val o = JSONObject()
@@ -437,6 +512,8 @@ object Storage {
                 o.put("fa", t.foreignAmount)
                 o.put("rate", t.rate)
             }
+            if (t.walletId != 0L) o.put("w", t.walletId)
+            if (t.receipt.isNotEmpty()) o.put("rc", t.receipt)
             txns.put(o)
         }
         root.put("txns", txns)
@@ -495,6 +572,8 @@ object Storage {
                 currency = it.optString("cur", "UZS"),
                 foreignAmount = it.optDouble("fa", 0.0),
                 rate = it.optDouble("rate", 0.0),
+                walletId = it.optLong("w", 0L),
+                receipt = it.optString("rc", ""),
             )
         },
         cushion = o.optJSONArray("cushion").mapObjects {
@@ -551,6 +630,26 @@ object Storage {
                 },
             )
         },
+        reflections = o.optJSONArray("reflections").mapObjects {
+            Reflection(
+                id = it.getLong("id"),
+                monthKey = it.optString("month", ""),
+                wasteful = it.optString("a", ""),
+                improved = it.optString("b", ""),
+                nextGoal = it.optString("c", ""),
+            )
+        },
+        budgetNeeds = o.optInt("bNeeds", 50),
+        budgetWants = o.optInt("bWants", 30),
+        saveRate = o.optInt("saveRate", 0),
+        wallets = o.optJSONArray("wallets").mapObjects {
+            Wallet(it.getLong("id"), it.optString("name", ""), it.optLong("opening", 0L))
+        },
+        transfers = o.optJSONArray("transfers").mapObjects {
+            Transfer(it.getLong("id"), it.getLong("from"), it.getLong("to"), it.getLong("amount"), it.getLong("date"))
+        },
+        customExpense = o.optJSONArray("cEx").strings(),
+        customIncome = o.optJSONArray("cIn").strings(),
         limits = parseLimits(o.optJSONObject("limits")),
         recurring = o.optJSONArray("recurring").mapObjects {
             Recurring(
@@ -576,4 +675,15 @@ object Storage {
         }
         return out
     }
+}
+
+
+private fun JSONArray?.strings(): List<String> {
+    if (this == null) return emptyList()
+    val out = ArrayList<String>()
+    for (i in 0 until length()) {
+        val v = optString(i, "")
+        if (v.isNotEmpty()) out.add(v)
+    }
+    return out
 }

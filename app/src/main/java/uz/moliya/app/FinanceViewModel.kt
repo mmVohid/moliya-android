@@ -44,6 +44,34 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun updateTxn(t: Txn) = update { d -> d.copy(txns = d.txns.map { if (it.id == t.id) t else it }) }
     fun restoreTxn(t: Txn) = update { d -> if (d.txns.any { it.id == t.id }) d else d.copy(txns = d.txns + t) }
 
+    // ───── Refleksiya va byudjet ─────
+    fun saveReflection(r: Reflection) = update { d ->
+        d.copy(reflections = d.reflections.filterNot { it.monthKey == r.monthKey } + r)
+    }
+
+    fun setBudget(needs: Int, wants: Int, saveRate: Int) =
+        update { it.copy(budgetNeeds = needs, budgetWants = wants, saveRate = saveRate) }
+
+    // ───── Hamyonlar va kategoriyalar ─────
+    fun addWallet(w: Wallet) = update { it.copy(wallets = it.wallets + w) }
+    fun deleteWallet(id: Long) = update { d ->
+        d.copy(
+            wallets = d.wallets.filterNot { it.id == id },
+            transfers = d.transfers.filterNot { it.fromId == id || it.toId == id },
+            txns = d.txns.map { if (it.walletId == id) it.copy(walletId = 0L) else it },
+        )
+    }
+    fun addTransfer(t: Transfer) = update { it.copy(transfers = it.transfers + t) }
+    fun deleteTransfer(id: Long) = update { d -> d.copy(transfers = d.transfers.filterNot { it.id == id }) }
+
+    fun addCategory(income: Boolean, name: String) = update { d ->
+        val n = name.trim()
+        if (n.isEmpty() || (d.expenseCategories + d.incomeCategories).any { it.equals(n, true) && (it in (if (income) d.incomeCategories else d.expenseCategories)) }) d
+        else if (income) d.copy(customIncome = d.customIncome + n) else d.copy(customExpense = d.customExpense + n)
+    }
+
+    fun setSecureScreen(on: Boolean) = updateSettings(settings.copy(secureScreen = on))
+
     // ───── Shablonlar ─────
     fun addTemplate(t: Template) = update { it.copy(templates = it.templates + t) }
     fun deleteTemplate(id: Long) = update { d -> d.copy(templates = d.templates.filterNot { it.id == id }) }
@@ -154,6 +182,14 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             recurring = imported.recurring,
             templates = imported.templates,
             goals = imported.goals,
+            reflections = imported.reflections,
+            budgetNeeds = imported.budgetNeeds,
+            budgetWants = imported.budgetWants,
+            saveRate = imported.saveRate,
+            wallets = imported.wallets,
+            transfers = imported.transfers,
+            customExpense = imported.customExpense,
+            customIncome = imported.customIncome,
         ) }
 
     // ───── Sozlamalar, qulf ─────

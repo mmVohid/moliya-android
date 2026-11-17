@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun RecurringSheet(
     items: List<Recurring>,
+    expenseCats: List<String>,
+    incomeCats: List<String>,
     onAdd: (Recurring) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
@@ -38,6 +40,8 @@ fun RecurringSheet(
     FormSheet(title = if (adding) "Yangi takroriy yozuv" else "Takroriy yozuvlar", onDismiss = onDismiss) {
         if (adding) {
             AddRecurringForm(
+                expenseCats = expenseCats,
+                incomeCats = incomeCats,
                 onSave = { r ->
                     onAdd(r)
                     adding = false
@@ -51,6 +55,19 @@ fun RecurringSheet(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val yearlyOut = items.filter { !it.isIncome }.sumOf { it.amount } * 12
+            val yearlyIn = items.filter { it.isIncome }.sumOf { it.amount } * 12
+            if (yearlyOut > 0 || yearlyIn > 0) {
+                Text(
+                    buildString {
+                        if (yearlyOut > 0) append("Yiliga takroriy xarajat: ${formatMoney(yearlyOut)}")
+                        if (yearlyOut > 0 && yearlyIn > 0) append("\n")
+                        if (yearlyIn > 0) append("Yiliga takroriy daromad: ${formatMoney(yearlyIn)}")
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
             items.forEach { r -> RecurringRow(r, onDelete = { onDelete(r.id) }) }
             BigButton(
                 text = "Yangi takroriy yozuv",
@@ -104,14 +121,14 @@ private fun RecurringRow(r: Recurring, onDelete: () -> Unit) {
 }
 
 @Composable
-private fun AddRecurringForm(onSave: (Recurring) -> Unit, onCancel: () -> Unit) {
+private fun AddRecurringForm(expenseCats: List<String>, incomeCats: List<String>, onSave: (Recurring) -> Unit, onCancel: () -> Unit) {
     var isIncome by remember { mutableStateOf(false) }
     var amount by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(Dates.today()) }
 
-    val categories = if (isIncome) Categories.income else Categories.expense
+    val categories = if (isIncome) incomeCats else expenseCats
     val canSave = parseMoney(amount) > 0 && category.isNotEmpty()
 
     SegmentedToggle(
@@ -158,12 +175,13 @@ private fun AddRecurringForm(onSave: (Recurring) -> Unit, onCancel: () -> Unit) 
 @Composable
 fun LimitsSheet(
     limits: Map<String, Long>,
+    categories: List<String>,
     onSave: (Map<String, Long>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val fields = remember {
         mutableStateMapOf<String, String>().apply {
-            Categories.expense.forEach { c -> put(c, limits[c]?.toString() ?: "") }
+            categories.forEach { c -> put(c, limits[c]?.toString() ?: "") }
         }
     }
 
@@ -173,7 +191,7 @@ fun LimitsSheet(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Categories.expense.forEach { category ->
+        categories.forEach { category ->
             MoneyField(
                 value = fields[category] ?: "",
                 onChange = { fields[category] = it },

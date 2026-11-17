@@ -54,6 +54,8 @@ fun HomeScreen(
     lastBackupAt: Long,
     onQuickAdd: (Boolean) -> Unit,
     onOpenReport: () -> Unit,
+    onOpenNetWorth: () -> Unit,
+    onOpenYear: () -> Unit,
 ) {
     val start = Dates.monthStart(0)
     val end = Dates.monthStart(1)
@@ -125,6 +127,13 @@ fun HomeScreen(
         }
 
         item { SavingsRateCard(data = data, onClick = onOpenReport) }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlineBigButton(text = "Sof boylik", onClick = onOpenNetWorth, modifier = Modifier.weight(1f))
+                OutlineBigButton(text = "Yillik hisobot", onClick = onOpenYear, modifier = Modifier.weight(1f))
+            }
+        }
 
         if (staleBackup) {
             item {
