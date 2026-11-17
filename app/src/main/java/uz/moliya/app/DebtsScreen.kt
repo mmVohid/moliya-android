@@ -398,7 +398,6 @@ private fun DebtCard(
 private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (Debt) -> Unit) {
     var isLent by remember { mutableStateOf(startAsLent) }
     var name by remember { mutableStateOf("") }
-    var surname by remember { mutableStateOf("") }
     var total by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var hasDue by remember { mutableStateOf(false) }
@@ -423,19 +422,9 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
             shape = RoundedCornerShape(14.dp),
         )
-        // 2. Familya
-        OutlinedTextField(
-            value = surname,
-            onValueChange = { surname = it.take(30) },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Familyasi") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
-            shape = RoundedCornerShape(14.dp),
-        )
-        // 3. Qarz summasi
+        // 2. Qarz summasi
         MoneyField(value = total, onChange = { total = it }, label = "Qarz summasi")
-        // 4. Telefon raqami
+        // 3. Telefon raqami
         OutlinedTextField(
             value = phone,
             onValueChange = { raw -> phone = raw.filter { ch -> ch.isDigit() || ch == '+' || ch == ' ' || ch == '-' }.take(18) },
@@ -446,7 +435,7 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done),
             shape = RoundedCornerShape(14.dp),
         )
-        // 5. Qaytarish muddati
+        // 4. Qaytarish muddati
         Row(
             Modifier
                 .fillMaxWidth()
@@ -464,7 +453,7 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
         if (hasDue) {
             DateField(millis = due, onChange = { due = it }, label = "Muddat")
         }
-        // 6. Saqlash
+        // 5. Saqlash
         BigButton(
             text = "Saqlash",
             enabled = canSave,
@@ -479,7 +468,6 @@ private fun AddDebtSheet(startAsLent: Boolean, onDismiss: () -> Unit, onSave: (D
                         dueDate = if (hasDue) due else 0L,
                         payments = emptyList(),
                         isLent = isLent,
-                        surname = surname.trim(),
                         phone = phone.trim(),
                     ),
                 )
