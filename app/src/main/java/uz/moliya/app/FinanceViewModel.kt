@@ -23,6 +23,11 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     init {
+        val migrated = CategoryMigration.apply(data)
+        if (migrated != data) {
+            data = migrated
+            Storage.save(getApplication<Application>(), migrated)
+        }
         applyRecurring()
     }
 
@@ -171,7 +176,8 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun markBackup() = update { it.copy(lastBackup = System.currentTimeMillis()) }
 
     /** Excel'dan tiklangan ma'lumot bilan to'liq almashtiradi. */
-    fun replaceData(imported: FinanceData) =
+    fun replaceData(raw: FinanceData) {
+        val imported = CategoryMigration.apply(raw)
         update { it.copy(
             txns = imported.txns,
             cushion = imported.cushion,
@@ -191,6 +197,7 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             customExpense = imported.customExpense,
             customIncome = imported.customIncome,
         ) }
+    }
 
     // ───── Sozlamalar, qulf ─────
     fun verifyPin(pin: String): Boolean = Pin.verify(pin, settings)

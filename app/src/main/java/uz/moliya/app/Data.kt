@@ -228,6 +228,37 @@ object Categories {
     val income = listOf("Avans", "Oylik", "Hadiya", "Qo'shimcha daromad", "Boshqa")
 }
 
+/** Eski kategoriya nomlarini yangi ro'yxatga o'tkazadi (qayta ishlatilsa ham xavfsiz). */
+object CategoryMigration {
+    private val expense = mapOf(
+        "Oziq-ovqat" to "Do'konlar",
+        "Kiyim" to "Do'konlar",
+        "Uy-joy" to "Kommunal xizmatlar",
+        "Aloqa" to "Mobile aloqa",
+        "Ko'ngilochar" to "Restoran va kofelar",
+        "Sog'liq" to "Boshqalar",
+        "Qarz to'lovi" to "Boshqalar",
+        "Boshqa" to "Boshqalar",
+    )
+    private val income = mapOf("Sovg'a" to "Hadiya")
+
+    private fun name(isIncome: Boolean, c: String) = (if (isIncome) income else expense)[c] ?: c
+
+    fun apply(d: FinanceData): FinanceData {
+        val limits = LinkedHashMap<String, Long>()
+        for ((k, v) in d.limits) {
+            val n = name(false, k)
+            limits[n] = (limits[n] ?: 0L) + v
+        }
+        return d.copy(
+            txns = d.txns.map { it.copy(category = name(it.isIncome, it.category)) },
+            templates = d.templates.map { it.copy(category = name(it.isIncome, it.category)) },
+            recurring = d.recurring.map { it.copy(category = name(it.isIncome, it.category)) },
+            limits = limits,
+        )
+    }
+}
+
 object Ids {
     private val counter = AtomicLong(System.currentTimeMillis() * 1000L)
     fun next(): Long = counter.incrementAndGet()
