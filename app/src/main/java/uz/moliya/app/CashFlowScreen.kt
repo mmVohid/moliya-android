@@ -552,8 +552,5 @@ private fun TxnSheet(
                 dismissButton = { TextButton(onClick = { showNewCategory = false }) { Text("Bekor qilish") } },
             )
         }
-
-        }
-
     }
 }
