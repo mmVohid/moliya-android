@@ -20,12 +20,12 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     /** PIN o'rnatilgan bo'lsa, ilova qulflangan holda ochiladi. */
     var locked by mutableStateOf(settings.hasPin)
+        private set
 
     private fun syncGlobals() {
         Dates.startDay = settings.monthStartDay
         NumberFormat.compact = settings.compactNumbers
     }
-        private set
 
     init {
         syncGlobals()
