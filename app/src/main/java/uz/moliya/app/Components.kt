@@ -2,6 +2,8 @@
 
 package uz.moliya.app
 
+import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
@@ -127,7 +129,7 @@ fun AppCard(
 ) {
     val shape = RoundedCornerShape(20.dp)
     val colors = CardDefaults.cardColors(containerColor = containerColor)
-    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
     if (onClick != null) {
         val source = remember { MutableInteractionSource() }
         val pressed by source.collectIsPressedAsState()
@@ -606,4 +608,24 @@ fun animatedLong(target: Long): Long {
         }
     }
     return from + ((to - from).toDouble() * progress.value).toLong()
+}
+
+
+/** Daromad/xarajat uchun yumshoq rangli dumaloq belgi (strelka bilan). */
+@Composable
+fun FlowBadge(income: Boolean, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(color.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (income) androidx.compose.material.icons.Icons.Rounded.ArrowDownward else androidx.compose.material.icons.Icons.Rounded.ArrowUpward,
+            contentDescription = if (income) "Daromad" else "Xarajat",
+            tint = color,
+            modifier = Modifier.size(22.dp),
+        )
+    }
 }

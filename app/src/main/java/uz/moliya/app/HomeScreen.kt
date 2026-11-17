@@ -1,5 +1,8 @@
 package uz.moliya.app
 
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -233,8 +236,27 @@ private fun HeroCard(
     Box(
         Modifier
             .fillMaxWidth()
+            .shadow(10.dp, RoundedCornerShape(24.dp), ambientColor = Brand.heroStart, spotColor = Brand.heroStart)
             .clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Brand.heroStart, Brand.heroEnd)))
+            .background(
+                Brush.linearGradient(
+                    listOf(Color(0xFF14A89A), Brand.heroStart, Brand.heroEnd),
+                    start = androidx.compose.ui.geometry.Offset(0f, 0f),
+                    end = androidx.compose.ui.geometry.Offset(900f, 700f),
+                ),
+            )
+            .drawBehind {
+                drawCircle(
+                    Color.White.copy(alpha = 0.08f),
+                    radius = size.width * 0.42f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.98f, -size.height * 0.05f),
+                )
+                drawCircle(
+                    Color.White.copy(alpha = 0.05f),
+                    radius = size.width * 0.28f,
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.05f, size.height * 1.08f),
+                )
+            }
             .padding(start = 24.dp, end = 12.dp, top = 12.dp, bottom = 24.dp),
     ) {
         Column {
@@ -280,6 +302,7 @@ private fun HeroStat(label: String, value: Long, hidden: Boolean, modifier: Modi
         modifier
             .clip(RoundedCornerShape(16.dp))
             .background(Color.White.copy(alpha = 0.16f))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))

@@ -313,7 +313,7 @@ private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit, modifier:
     }
     AppCard(modifier = modifier, padding = 12.dp, onClick = onEdit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LetterBadge(if (txn.isIncome) "+" else "−", color)
+            FlowBadge(txn.isIncome, color)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
