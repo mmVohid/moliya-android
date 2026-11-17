@@ -181,13 +181,30 @@ fun CashFlowScreen(
                     )
                 }
             } else {
-                items(shown, key = { it.id }) { txn ->
-                    TxnRow(
-                        modifier = Modifier.animateItem(),
-                        txn = txn,
-                        onEdit = { editing = txn },
-                        onDelete = { onDelete(txn) },
-                    )
+                val todayMs = Dates.today()
+                shown.groupBy { it.date }.forEach { (day, list) ->
+                    item(key = "day$day") {
+                        val label = when (day) {
+                            todayMs -> "Bugun"
+                            todayMs - 24L * 60 * 60 * 1000 -> "Kecha"
+                            else -> Dates.format(day)
+                        }
+                        Text(
+                            label,
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    items(list, key = { it.id }) { txn ->
+                        TxnRow(
+                            modifier = Modifier.animateItem(),
+                            txn = txn,
+                            onEdit = { editing = txn },
+                            onDelete = { onDelete(txn) },
+                        )
+                    }
                 }
             }
         }
