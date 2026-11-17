@@ -384,7 +384,8 @@ private fun TxnSheet(
 
     val categories = if (isIncome) data.incomeCategories else data.expenseCategories
     val amountUzs: Long = parseMoney(amount)
-    val canSave = amountUzs > 0 && category.isNotEmpty()
+    val canSave = amountUzs > 0
+    val finalCategory = category.ifEmpty { if (isIncome) "Boshqa" else "Boshqalar" }
     val templates = data.templates.filter { it.isIncome == isIncome }
 
     val saveButton: @Composable () -> Unit = {
@@ -398,24 +399,13 @@ private fun TxnSheet(
                         id = initial?.id ?: Ids.next(),
                         isIncome = isIncome,
                         amount = amountUzs,
-                        category = category,
+                        category = finalCategory,
                         note = note.trim(),
                         date = date,
                         walletId = walletId,
                         receipt = receipt,
                     ),
                 )
-                if (initial == null && saveAsTemplate) {
-                    onAddTemplate(
-                        Template(
-                            id = Ids.next(),
-                            isIncome = isIncome,
-                            amount = amountUzs,
-                            category = category,
-                            note = note.trim(),
-                        ),
-                    )
-                }
                 onDismiss()
             },
         )
@@ -446,51 +436,6 @@ private fun TxnSheet(
             },
         )
 
-        if (initial == null && templates.isNotEmpty()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "Shablonlar",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                TextButton(onClick = { manageTemplates = !manageTemplates }, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(if (manageTemplates) "Tayyor" else "Boshqarish")
-                }
-            }
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                templates.forEach { t ->
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            if (manageTemplates) {
-                                onDeleteTemplate(t.id)
-                            } else {
-                                amount = t.amount.toString()
-                                category = t.category
-                                note = t.note
-                            }
-                        },
-                        label = {
-                            Text(
-                                "${t.note.ifBlank { t.category }} · ${formatMoney(t.amount)}",
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        },
-                        trailingIcon = if (manageTemplates) {
-                            { Icon(Icons.Rounded.Close, contentDescription = "Shablonni o'chirish", modifier = Modifier.size(18.dp)) }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier.heightIn(min = 40.dp),
-                    )
-                }
-            }
-        }
-
         // 1. Summa
         MoneyField(value = amount, onChange = { amount = it }, label = "Summa", focusRequester = amountFocus)
 
@@ -502,7 +447,7 @@ private fun TxnSheet(
 
         // 4. Chekni ilova qilish
         Text(
-            "Chekni ilova qilish",
+            "Chekni ilova qilish (ixtiyoriy)",
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
         )
@@ -551,8 +496,8 @@ private fun TxnSheet(
                 modifier = Modifier
                     .menuAnchor()
                     .fillMaxWidth(),
-                label = { Text("Kategoriya") },
-                placeholder = { Text("Tanlang") },
+                label = { Text("Kategoriya (ixtiyoriy)") },
+                placeholder = { Text(if (isIncome) "Boshqa (ixtiyoriy)" else "Boshqalar (ixtiyoriy)") },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
                 shape = RoundedCornerShape(14.dp),
             )
@@ -608,31 +553,6 @@ private fun TxnSheet(
             )
         }
 
-        if (data.wallets.isNotEmpty()) {
-            Text("Hamyon", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = walletId == 0L, onClick = { walletId = 0L }, label = { Text("Belgilanmagan") }, modifier = Modifier.heightIn(min = 40.dp))
-                data.wallets.forEach { w ->
-                    FilterChip(selected = walletId == w.id, onClick = { walletId = w.id }, label = { Text(w.name) }, modifier = Modifier.heightIn(min = 40.dp))
-                }
-            }
-        }
-
-        if (initial == null) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clickable { saveAsTemplate = !saveAsTemplate },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "Shablon sifatida saqlash",
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                Switch(checked = saveAsTemplate, onCheckedChange = { saveAsTemplate = it })
-            }
         }
 
     }
