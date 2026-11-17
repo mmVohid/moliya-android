@@ -2,6 +2,8 @@
 
 package uz.moliya.app
 
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Widgets
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -85,6 +87,7 @@ fun SettingsScreen(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () ->
     when (page) {
         "security" -> SecurityPage(vm, back)
         "notif" -> NotificationsPage(vm, back)
+        "widgets" -> WidgetsPage(vm, back)
         "look" -> LookPage(vm, back)
         "data" -> DataPage(vm, onOpenBackup, back)
         "about" -> AboutPage(back)
@@ -176,92 +179,104 @@ private fun Hint(text: String) {
 // ───────────────────────── Asosiy ro'yxat ─────────────────────────
 
 @Composable
+private fun GroupLabel(text: String) {
+    Text(
+        text.uppercase(),
+        modifier = Modifier.padding(start = 8.dp, top = 8.dp),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+@Composable
+private fun Divider() {
+    androidx.compose.material3.HorizontalDivider(
+        modifier = Modifier.padding(start = 72.dp),
+        color = MaterialTheme.colorScheme.outlineVariant,
+    )
+}
+
+@Composable
 private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
     val s = vm.settings
-    val data = vm.data
-    var editName by remember { mutableStateOf(false) }
-
-    val protection = buildList {
-        if (s.hasPin) add("PIN")
-        if (s.hasPin && s.biometric) add("barmoq izi")
-        if (s.secureScreen) add("ekran himoyasi")
-    }
+    val widgetCount = listOf(1, 4, 8, 16).count { s.homeCards and it != 0 }
     val notifCount = listOf(s.reminders, s.dailyReminder, s.backupReminder).count { it }
+    val securityStatus = buildList {
+        if (s.hasPin) add("PIN")
+        if (s.encryptData) add("AES-256")
+    }.ifEmpty { listOf("O'chiq") }.joinToString(" · ")
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item { SubHeader("Sozlamalar", onBack) }
 
+        item { GroupLabel("Asosiy") }
         item {
-            AppCard(onClick = { editName = true }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            (s.userName.firstOrNull()?.uppercase() ?: "M"),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimary,
-                        )
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (s.userName.isBlank()) "Ismingizni kiriting" else s.userName,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                        )
-                        Text(
-                            if (protection.isEmpty()) "Himoya: yoqilmagan" else "Himoya: " + protection.joinToString(" + "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Icon(Icons.Rounded.Edit, contentDescription = "Ismni o'zgartirish", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
+            AppCard(padding = 0.dp) {
+                NavRow(Icons.Rounded.Widgets, Color(0xFF2E7D6B), "Vidjetlar", "$widgetCount/4") { onOpen("widgets") }
+                Divider()
+                NavRow(Icons.Rounded.Palette, Color(0xFF7B5EA7), "Ko'rinish", listOf("Tizim", "Yorug'", "Qorong'i")[s.theme.coerceIn(0, 2)]) { onOpen("look") }
+                Divider()
+                NavRow(Icons.Rounded.Notifications, Color(0xFFE57C23), "Bildirishnomalar", if (notifCount == 0) "O'chiq" else "$notifCount ta yoqilgan") { onOpen("notif") }
             }
         }
 
+        item { GroupLabel("Xavfsizlik") }
         item {
             AppCard(padding = 0.dp) {
-                NavRow(Icons.Rounded.Lock, Color(0xFF2E7D6B), "Xavfsizlik va maxfiylik", if (s.hasPin) "PIN: yoqilgan" else "PIN: o'chiq") { onOpen("security") }
-                NavRow(Icons.Rounded.Notifications, Color(0xFFE57C23), "Bildirishnomalar", if (notifCount == 0) "O'chiq" else "$notifCount ta yoqilgan") { onOpen("notif") }
-                NavRow(Icons.Rounded.Palette, Color(0xFF7B5EA7), "Ko'rinish", listOf("Tizim", "Yorug'", "Qorong'i")[s.theme.coerceIn(0, 2)]) { onOpen("look") }
                 NavRow(Icons.Rounded.Storage, Color(0xFF2F80ED), "Ma'lumotlar va zaxira", if (s.autoBackup) "Avto: yoqilgan" else "Avto: o'chiq") { onOpen("data") }
+                Divider()
+                NavRow(Icons.Rounded.Lock, Color(0xFFD94F70), "Xavfsizlik va maxfiylik", securityStatus) { onOpen("security") }
+            }
+        }
+
+        item { GroupLabel("Boshqa") }
+        item {
+            AppCard(padding = 0.dp) {
                 NavRow(Icons.Rounded.Info, Color(0xFF6B7280), "Ilova haqida", "v${BuildConfig.VERSION_NAME}") { onOpen("about") }
             }
         }
     }
+}
 
-    if (editName) {
-        var name by remember { mutableStateOf(s.userName) }
-        AlertDialog(
-            onDismissRequest = { editName = false },
-            title = { Text("Ismingiz") },
-            text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(24) },
-                    label = { Text("Ism") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    vm.setUserName(name)
-                    editName = false
-                }) { Text("Saqlash") }
-            },
-            dismissButton = { TextButton(onClick = { editName = false }) { Text("Bekor qilish") } },
-        )
+// ───────────────────────── Vidjetlar ─────────────────────────
+
+@Composable
+private fun WidgetsPage(vm: FinanceViewModel, onBack: () -> Unit) {
+    val s = vm.settings
+    val cardNames = listOf(
+        1 to "Oxirgi 12 oy grafigi",
+        4 to "Jamg'arma darajasi",
+        8 to "Jamg'arma va qarzlar",
+        16 to "Tahlil ro'yxati",
+    )
+    Page("Vidjetlar", onBack) {
+        item {
+            AppCard {
+                Text("Bosh sahifa kartalari", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Hint("Bosh sahifada qaysi kartalar ko'rinishini tanlang.")
+                Spacer(Modifier.height(8.dp))
+                cardNames.forEach { (bit, name) ->
+                    SwitchRow(
+                        title = name,
+                        subtitle = "",
+                        checked = s.homeCards and bit != 0,
+                        onChange = { on -> vm.setHomeCards(if (on) s.homeCards or bit else s.homeCards and bit.inv()) },
+                    )
+                }
+            }
+        }
+        item {
+            AppCard {
+                Text("Telefon ekranidagi vidjet", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Hint("Bosh ekranning bo'sh joyini uzoq bosing, \"Vidjetlar\" ni tanlang va \"Moliya\" ni qo'shing. Undan ilovani ochmasdan daromad yoki xarajat yozish mumkin.")
+            }
+        }
     }
 }
 
@@ -321,6 +336,18 @@ private fun SecurityPage(vm: FinanceViewModel, onBack: () -> Unit) {
                     checked = s.secureScreen,
                     onChange = vm::setSecureScreen,
                 )
+            }
+        }
+        item {
+            AppCard {
+                SwitchRow(
+                    title = "Ma'lumotlarni shifrlash (AES-256)",
+                    subtitle = "Ma'lumot fayli telefon kaliti (Android Keystore) bilan shifrlanadi. Kalit telefondan chiqmaydi.",
+                    checked = s.encryptData,
+                    onChange = vm::setEncryption,
+                )
+                Spacer(Modifier.height(4.dp))
+                Hint("Excel zaxira va chek rasmlari shifrlanmaydi. Ilovani o'chirib qayta o'rnatsangiz, shifrlangan ma'lumotni tiklab bo'lmaydi, shuning uchun Excel nusxa oling.")
             }
         }
         item {
@@ -469,12 +496,6 @@ private fun NotificationsPage(vm: FinanceViewModel, onBack: () -> Unit) {
 @Composable
 private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
     val s = vm.settings
-    val cardNames = listOf(
-        1 to "Oxirgi 12 oy grafigi",
-        4 to "Jamg'arma darajasi",
-        8 to "Jamg'arma va qarzlar",
-        16 to "Tahlil ro'yxati",
-    )
     Page("Ko'rinish", onBack) {
         item {
             AppCard {
@@ -518,20 +539,6 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
                     selected = if (s.compactNumbers) 1 else 0,
                     onSelect = { vm.setCompactNumbers(it == 1) },
                 )
-            }
-        }
-        item {
-            AppCard {
-                Text("Bosh sahifa kartalari", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(4.dp))
-                cardNames.forEach { (bit, name) ->
-                    SwitchRow(
-                        title = name,
-                        subtitle = "",
-                        checked = s.homeCards and bit != 0,
-                        onChange = { on -> vm.setHomeCards(if (on) s.homeCards or bit else s.homeCards and bit.inv()) },
-                    )
-                }
             }
         }
     }
@@ -733,7 +740,7 @@ private fun AboutPage(onBack: () -> Unit) {
             AppCard {
                 Text("Cheklovlar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(8.dp))
-                Hint("• PIN-kod ilovani qulflaydi, lekin ma'lumotni shifrlamaydi.")
+                Hint("• PIN-kod ilovani qulflaydi. Ma'lumotni shifrlash alohida yoqiladi (AES-256).")
                 Hint("• Excel zaxira fayllari himoyasiz. Ularni xavfsiz joyda saqlang.")
                 Hint("• PIN esdan chiqsa, tiklab bo'lmaydi.")
                 Hint("• Chek rasmlari telefonda qoladi va Excelga kirmaydi.")
@@ -785,6 +792,14 @@ private fun AboutPage(onBack: () -> Unit) {
         item {
             AppCard(padding = 0.dp) {
                 NavRow(Icons.Rounded.Info, Color(0xFF2E7D6B), "Qisqa qo'llanma", "") { showHelp = true }
+                Divider()
+                NavRow(Icons.Rounded.Code, Color(0xFF24292F), "Manba kodini ko'rish", "GitHub") {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mmVohid/moliya-android"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+                Divider()
                 NavRow(Icons.Rounded.Edit, Color(0xFFE57C23), "Muammo haqida yozish", "") {
                     context.startActivity(
                         Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/mmVohid/moliya-android/issues/new"))

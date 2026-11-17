@@ -454,7 +454,9 @@ object Storage {
         val f = file(context)
         if (!f.exists()) return FinanceData()
         return try {
-            parse(JSONObject(f.readText(Charsets.UTF_8)))
+            val bytes = f.readBytes()
+            val text = String(if (DataCrypto.isEncrypted(bytes)) DataCrypto.decrypt(bytes) else bytes, Charsets.UTF_8)
+            parse(JSONObject(text))
         } catch (e: Exception) {
             // Buzilgan faylni yo'qotmaymiz: nusxasini saqlab qo'yamiz.
             try {
@@ -469,9 +471,19 @@ object Storage {
     fun save(context: Context, data: FinanceData) {
         val f = file(context)
         val tmp = File(context.filesDir, "$FILE_NAME.tmp")
-        tmp.writeText(toJson(data).toString(), Charsets.UTF_8)
+        val plain = toJson(data).toString().toByteArray(Charsets.UTF_8)
+        val out = if (Prefs.load(context).encryptData) {
+            try {
+                DataCrypto.encrypt(plain)
+            } catch (e: Exception) {
+                plain
+            }
+        } else {
+            plain
+        }
+        tmp.writeBytes(out)
         if (!tmp.renameTo(f)) {
-            f.writeText(tmp.readText(Charsets.UTF_8), Charsets.UTF_8)
+            f.writeBytes(tmp.readBytes())
             tmp.delete()
         }
     }

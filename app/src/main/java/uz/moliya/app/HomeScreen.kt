@@ -97,7 +97,7 @@ fun HomeScreen(
     ) {
         item {
             Box(Modifier.fillMaxWidth()) {
-                ScreenHeader(if (userName.isBlank()) "Moliya" else "Salom, $userName", Dates.monthLabel(0))
+                ScreenHeader("Moliya", Dates.monthLabel(0))
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier

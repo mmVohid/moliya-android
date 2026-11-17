@@ -25,6 +25,7 @@ data class AppSettings(
     /** Android 12+: ilova rangi fon rasmiga moslashadi */
     val dynamicColor: Boolean = false,
     val userName: String = "",
+    val encryptData: Boolean = false,
     /** Fonda qancha turgach qayta qulflanadi (soniya) */
     val lockDelaySec: Int = 15,
     val backupReminder: Boolean = true,
@@ -65,6 +66,7 @@ object Prefs {
             onboarded = sp.getBoolean("onboarded", false),
             dynamicColor = sp.getBoolean("dynamicColor", false),
             userName = sp.getString("userName", "") ?: "",
+            encryptData = sp.getBoolean("encryptData", false),
             lockDelaySec = sp.getInt("lockDelaySec", 15),
             backupReminder = sp.getBoolean("backupReminder", true),
             dailyReminder = sp.getBoolean("dailyReminder", false),
@@ -94,6 +96,7 @@ object Prefs {
             .putBoolean("onboarded", s.onboarded)
             .putBoolean("dynamicColor", s.dynamicColor)
             .putString("userName", s.userName)
+            .putBoolean("encryptData", s.encryptData)
             .putInt("lockDelaySec", s.lockDelaySec)
             .putBoolean("backupReminder", s.backupReminder)
             .putBoolean("dailyReminder", s.dailyReminder)

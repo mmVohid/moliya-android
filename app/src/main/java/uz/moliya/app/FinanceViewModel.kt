@@ -126,6 +126,11 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setEncryption(on: Boolean) {
+        updateSettings(settings.copy(encryptData = on))
+        Storage.save(getApplication<Application>(), data)
+    }
+
     fun setUserName(name: String) = updateSettings(settings.copy(userName = name.trim().take(24)))
     fun setLockDelay(sec: Int) = updateSettings(settings.copy(lockDelaySec = sec))
     fun setBackupReminder(on: Boolean) = updateSettings(settings.copy(backupReminder = on))
