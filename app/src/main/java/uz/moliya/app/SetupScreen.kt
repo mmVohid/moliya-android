@@ -49,7 +49,7 @@ import androidx.core.content.ContextCompat
 
 private data class SetupStep(val icon: ImageVector, val title: String, val text: String, val action: String)
 
-/** Birinchi ochilish: ortiqcha ekranlarsiz, ketma-ket faqat ruxsat/taklif oynalari. Hammasini Sozlamalardan o'zgartirish mumkin. */
+/** Birinchi ochilish: faqat bildirishnoma ruxsati so'raladi. Qolganini foydalanuvchi Sozlamalardan yoqadi. */
 @Composable
 fun SetupScreen(
     settings: AppSettings,
@@ -62,81 +62,19 @@ fun SetupScreen(
     onAutoBackup: (Boolean) -> Unit,
     onFinish: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var index by rememberSaveable { mutableStateOf(0) }
-    var showPin by remember { mutableStateOf(false) }
-
-    fun next() {
-        if (index >= 3) onFinish() else index += 1
-    }
-
     val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) onReminders(true)
-        next()
-    }
-    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                )
-                onPickFolder(uri.toString())
-                onAutoBackup(true)
-            } catch (e: SecurityException) {
-                // ruxsat olinmadi
-            }
-        }
-        next()
+        onFinish()
     }
 
-    // Tizim oynalari (bildirishnoma, papka) darhol; qolganlari qisqa ha/yo'q oynasi
-    LaunchedEffect(index) {
-        when (index) {
-            0 -> if (android.os.Build.VERSION.SDK_INT >= 33) {
-                notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-            } else {
-                onReminders(true)
-                next()
-            }
-            3 -> folderLauncher.launch(null)
+    LaunchedEffect(Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            notificationLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onReminders(true)
+            onFinish()
         }
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-
-    if (index == 1) {
-        AlertDialog(
-            onDismissRequest = { next() },
-            title = { Text("Ekranni himoyalaymizmi?") },
-            text = { Text("Skrinshot olish va oxirgi ilovalarda summalar ko'rinishi bloklanadi.") },
-            confirmButton = { TextButton(onClick = { onSecureScreen(true); next() }) { Text("Ha") } },
-            dismissButton = { TextButton(onClick = { next() }) { Text("Hozir emas") } },
-        )
-    }
-    if (index == 2 && !showPin) {
-        AlertDialog(
-            onDismissRequest = { next() },
-            title = { Text("PIN-kod o'rnatamizmi?") },
-            text = { Text("Ilovani 4 xonali PIN bilan qulflaysiz.") },
-            confirmButton = { TextButton(onClick = { showPin = true }) { Text("Ha") } },
-            dismissButton = { TextButton(onClick = { next() }) { Text("Hozir emas") } },
-        )
-    }
-    if (index == 2 && showPin) {
-        PinFlowSheet(
-            mode = PinMode.SET,
-            verify = verifyPin,
-            onSet = {
-                onSetPin(it)
-                showPin = false
-                next()
-            },
-            onRemove = onClearPin,
-            onDismiss = {
-                showPin = false
-                next()
-            },
-        )
-    }
 }
