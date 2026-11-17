@@ -48,15 +48,21 @@ object XlsxImporter {
         val shared = files["xl/sharedStrings.xml"]?.let { parseShared(it) } ?: emptyList()
 
         val sheets = HashMap<String, List<List<String>>>()
-        for ((name, rid) in sheetRefs) {
-            val target = rels[rid] ?: continue
-            val path = if (target.startsWith("/")) target.trimStart('/') else "xl/$target"
-            val bytes = files[path] ?: continue
-            sheets[name] = parseSheet(bytes, shared)
+        val canonical = KNOWN_SHEETS.associateBy { it.lowercase() }
+        sheetRefs.forEachIndexed { index, (rawName, rid) ->
+            val name = canonical[rawName.trim().lowercase()] ?: rawName.trim()
+            val target = rels[rid]
+            val candidates = listOfNotNull(
+                target?.let { if (it.startsWith("/")) it.trimStart('/') else if (it.startsWith("xl/")) it else "xl/$it" },
+                "xl/worksheets/sheet${index + 1}.xml",
+            )
+            val bytes = candidates.firstNotNullOfOrNull { files[it] }
+            if (bytes != null) sheets[name] = parseSheet(bytes, shared)
         }
 
         if (sheets.keys.none { it in KNOWN_SHEETS }) {
-            throw ImportException("Bu Moliya zaxira fayli emas. Ilovadan \"Excelga yuklab olish\" orqali olingan faylni tanlang.")
+            val found = sheetRefs.map { it.first }.take(4).joinToString(", ").ifEmpty { "varaq topilmadi" }
+            throw ImportException("Bu Moliya zaxira fayli emas. Ilovadan \"Excelga yuklab olish\" orqali olingan faylni tanlang. (Faylda: $found)")
         }
 
         val wallets = sheets["Hamyonlar"].dataRows().mapNotNull { r ->
