@@ -471,7 +471,6 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
     val s = vm.settings
     val cardNames = listOf(
         1 to "Oxirgi 12 oy grafigi",
-        2 to "Bu oy xarajatlari",
         4 to "Jamg'arma darajasi",
         8 to "Jamg'arma va qarzlar",
         16 to "Tahlil ro'yxati",
@@ -519,6 +518,20 @@ private fun LookPage(vm: FinanceViewModel, onBack: () -> Unit) {
                     selected = if (s.compactNumbers) 1 else 0,
                     onSelect = { vm.setCompactNumbers(it == 1) },
                 )
+            }
+        }
+        item {
+            AppCard {
+                Text("Bosh sahifa kartalari", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                cardNames.forEach { (bit, name) ->
+                    SwitchRow(
+                        title = name,
+                        subtitle = "",
+                        checked = s.homeCards and bit != 0,
+                        onChange = { on -> vm.setHomeCards(if (on) s.homeCards or bit else s.homeCards and bit.inv()) },
+                    )
+                }
             }
         }
     }

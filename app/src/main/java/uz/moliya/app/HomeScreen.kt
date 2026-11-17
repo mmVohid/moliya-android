@@ -83,14 +83,7 @@ fun HomeScreen(
     val expenses = offsets.map { data.expense(Dates.monthStart(it), Dates.monthStart(it + 1)) }
     val labels = offsets.map { Dates.shortMonth(it) }
 
-    val byCategory = data.txns
-        .filter { !it.isIncome && it.date >= start && it.date < end }
-        .groupBy { it.category }
-        .map { entry -> entry.key to entry.value.sumOf { t -> t.amount } }
-        .sortedByDescending { pair -> pair.second }
 
-    val dayMs = 24L * 60 * 60 * 1000
-    val today = Dates.today()
     val weekMs = 7L * 24 * 60 * 60 * 1000
     // Avto-zaxira yoqilmagan bo'lsa: oxirgi nusxadan (yo'q bo'lsa birinchi yozuvdan) 7 kun o'tgach ogohlantiramiz
     val reference = if (lastBackupAt > 0L) lastBackupAt else firstEntryAt
@@ -180,48 +173,52 @@ fun HomeScreen(
             }
         }
 
-
-        val monthLimit = data.limits[""] ?: 0L
-        if (monthLimit > 0L) {
-            item { LimitBar(spent = expense, limit = monthLimit, hidden = data.hideBalance, onClick = { onOpenTab(1) }) }
-        }
-
-        val soon = data.debts
-            .filter { it.remaining > 0L && it.dueDate > 0L && it.dueDate - today <= 3L * dayMs }
-            .sortedBy { it.dueDate }
-        if (soon.isNotEmpty()) {
-            item { DueDebtsCard(soon, today, data.hideBalance) { onOpenTab(3) } }
-        }
-
-        val goal = data.goals.filter { it.remaining > 0L }
-            .sortedWith(compareBy({ if (it.deadline > 0L) 0 else 1 }, { it.deadline }))
-            .firstOrNull()
-        if (goal != null) {
-            item { GoalCard(goal, data.hideBalance) { onOpenTab(2) } }
-        }
-
-        if (!data.isEmpty) {
-            item { SectionTitle("Oxirgi 12 oy") }
-            item {
-                AppCard {
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        LegendDot("Daromad", Brand.income)
-                        LegendDot("Xarajat", Brand.expense)
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    val details = offsets.mapIndexed { i, off ->
-                        if (data.hideBalance) Dates.monthLabel(off) + ": •••••••"
-                        else Dates.monthLabel(off) + ":  +" + formatMoney(incomes[i]) + "   −" + formatMoney(expenses[i])
-                    }
-                    DualBarChart(incomes, expenses, labels, details)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Oy ustiga bosing: tafsilot yuqorida ko'rinadi.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        if (data.isEmpty) {
+        } else {
+        if (cards and 4 != 0) item { SectionTitle("Bu oy") }
+        if (cards and 4 != 0) item { SavingsRateCard(data = data, onClick = onOpenReport) }
+        if (cards and 1 != 0) item { SectionTitle("Oxirgi 12 oy") }
+        if (cards and 1 != 0) item {
+            AppCard {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LegendDot("Daromad", Brand.income)
+                    LegendDot("Xarajat", Brand.expense)
                 }
+                Spacer(Modifier.height(16.dp))
+                val details = offsets.mapIndexed { i, off ->
+                    if (data.hideBalance) Dates.monthLabel(off) + ": •••••••"
+                    else Dates.monthLabel(off) + ":  +" + formatMoney(incomes[i]) + "   −" + formatMoney(expenses[i])
+                }
+                DualBarChart(incomes, expenses, labels, details)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Oy ustiga bosing: tafsilot yuqorida ko'rinadi. Oldingi oylar uchun chapga suring.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+        }
+
+        if (cards and 8 != 0) item { SectionTitle("Jamg'arma va qarzlar") }
+        if (cards and 8 != 0) item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CushionMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(2) }
+                DebtMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(3) }
+            }
+        }
+        if (cards and 16 != 0) item { SectionTitle("Tahlil") }
+        if (cards and 16 != 0) item {
+            AppCard(padding = 4.dp) {
+                NavRow(Icons.Rounded.Assessment, "Oylik hisobot", "Tejash, byudjet va xulosalar", onOpenReport)
+                NavRow(Icons.Rounded.AccountBalance, "Sof boylik", "Hamyonlar, jamg'arma va qarzlar", onOpenNetWorth)
+                NavRow(Icons.Rounded.CalendarMonth, "Yillik hisobot", "Butun yil bo'yicha natija", onOpenYear)
+            }
+        }
         }
     }
 }
@@ -571,111 +568,5 @@ private fun NavRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title:
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-
-@Composable
-private fun LimitBar(spent: Long, limit: Long, hidden: Boolean, onClick: () -> Unit) {
-    val ratio = spent.toFloat() / limit.toFloat()
-    val color = when {
-        ratio >= 1f -> Brand.expense
-        ratio >= 0.8f -> Brand.warning
-        else -> Brand.primary
-    }
-    AppCard(onClick = onClick, padding = 16.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Oylik limit",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                "${(ratio * 100).toInt()}%",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Bold,
-                color = color,
-            )
-        }
-        Spacer(Modifier.height(10.dp))
-        ProgressBar(progress = ratio.coerceIn(0f, 1f), color = color)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (hidden) "•••••• / ••••••"
-            else if (spent > limit) "Limitdan ${formatMoney(spent - limit)} oshgan"
-            else "${formatMoney(spent)} / ${formatMoney(limit)}  ·  qoldi ${formatMoney(limit - spent)}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun DueDebtsCard(debts: List<Debt>, today: Long, hidden: Boolean, onClick: () -> Unit) {
-    AppCard(onClick = onClick, padding = 16.dp, containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
-        Text(
-            "Qarz muddati yaqin",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = Brand.warning,
-        )
-        debts.take(3).forEach { d ->
-            Spacer(Modifier.height(8.dp))
-            val days = ((d.dueDate - today) / (24L * 60 * 60 * 1000)).toInt()
-            val whenText = when {
-                days < 0 -> "${-days} kun o'tgan"
-                days == 0 -> "bugun"
-                else -> "$days kundan keyin"
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        d.fullName,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        (if (d.isLent) "Sizga qaytariladi" else "Siz qaytarasiz") + " · " + whenText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer,
-                    )
-                }
-                Text(
-                    if (hidden) "••••••" else formatMoney(d.remaining),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun GoalCard(goal: Goal, hidden: Boolean, onClick: () -> Unit) {
-    AppCard(onClick = onClick, padding = 16.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                goal.name,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-            Text("${(goal.progress * 100).toInt()}%", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Brand.primary)
-        }
-        Spacer(Modifier.height(10.dp))
-        ProgressBar(progress = goal.progress, color = Brand.primary)
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (hidden) "•••••• / ••••••"
-            else "${formatMoney(goal.saved)} / ${formatMoney(goal.target)}" +
-                if (goal.deadline > 0L) "  ·  muddat ${Dates.format(goal.deadline)}" else "",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
