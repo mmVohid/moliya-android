@@ -29,41 +29,31 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun LimitsSheet(
     limits: Map<String, Long>,
-    categories: List<String>,
     onSave: (Map<String, Long>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val fields = remember {
-        mutableStateMapOf<String, String>().apply {
-            categories.forEach { c -> put(c, limits[c]?.toString() ?: "") }
-        }
-    }
+    var text by remember { mutableStateOf(limits[""]?.toString() ?: "") }
 
-    FormSheet(title = "Oylik limitlar", onDismiss = onDismiss) {
+    FormSheet(
+        title = "Oylik umumiy xarajat limiti",
+        onDismiss = onDismiss,
+        footer = {
+            BigButton(
+                text = "Saqlash",
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    val value = parseMoney(text)
+                    onSave(if (value > 0L) mapOf("" to value) else emptyMap())
+                    onDismiss()
+                },
+            )
+        },
+    ) {
         Text(
-            "Kategoriya uchun oylik xarajat limitini qo'ying. Limit 80% dan oshsa Bosh sahifada ogohlantiramiz, oshib ketsa xabar beramiz. Bo'sh qoldirsangiz, limitsiz.",
+            "Bir oyda jami qancha sarflash mumkinligini belgilang. Limitning 80% dan oshsa va oshib ketsa xabar beramiz. Bo'sh qoldirsangiz, limitsiz.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        categories.forEach { category ->
-            MoneyField(
-                value = fields[category] ?: "",
-                onChange = { fields[category] = it },
-                label = category,
-            )
-        }
-        BigButton(
-            text = "Saqlash",
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                val result = LinkedHashMap<String, Long>()
-                fields.forEach { (category, text) ->
-                    val value = parseMoney(text)
-                    if (value > 0L) result[category] = value
-                }
-                onSave(result)
-                onDismiss()
-            },
-        )
+        MoneyField(value = text, onChange = { text = it }, label = "Oylik limit")
     }
 }

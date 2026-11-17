@@ -316,7 +316,6 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onSaveLimits = vm::setLimits,
                         onAddTemplate = vm::addTemplate,
                         onDeleteTemplate = vm::deleteTemplate,
-                        onAddCategory = vm::addCategory,
                     )
                     2 -> SavingsHost(
                         data = data,
@@ -394,20 +393,20 @@ fun MoliyaApp(vm: FinanceViewModel) {
     }
 }
 
-/** Yangi xarajat kategoriya limitidan oshirsa, xabar beradi (faqat joriy oy uchun). */
+/** Yangi xarajat oylik umumiy limitdan oshirsa, xabar beradi (faqat joriy oy uchun). */
 private fun warnIfOverLimit(before: FinanceData, txn: Txn, notify: (String) -> Unit) {
     if (txn.isIncome) return
-    val limit = before.limits[txn.category] ?: return
+    val limit = before.limits[""] ?: return
     val start = Dates.monthStart(0)
     val end = Dates.monthStart(1)
     if (txn.date < start || txn.date >= end) return
-    val spentBefore = before.categorySpent(txn.category, start, end)
+    val spentBefore = before.expense(start, end)
     val spentAfter = spentBefore + txn.amount
     if (spentAfter > limit && spentBefore <= limit) {
-        notify("\"${txn.category}\" limiti oshdi: ${formatMoney(spentAfter)} / ${formatMoney(limit)}")
+        notify("Oylik limit oshdi: ${formatMoney(spentAfter)} / ${formatMoney(limit)}")
     } else if (spentAfter > limit) {
-        notify("\"${txn.category}\" limitdan ${formatMoney(spentAfter - limit)} ortiq")
+        notify("Limitdan ${formatMoney(spentAfter - limit)} ortiq")
     } else if (spentAfter * 10 >= limit * 8 && spentBefore * 10 < limit * 8) {
-        notify("\"${txn.category}\" limitining 80% dan oshdi")
+        notify("Oylik limitning 80% dan oshdi")
     }
 }

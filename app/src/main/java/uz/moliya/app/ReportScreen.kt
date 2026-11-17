@@ -92,10 +92,8 @@ fun ReportScreen(
             )
         }
     }
-    val growth = byCat.firstOrNull { (c, v) -> val p = prevByCat[c] ?: 0L; p > 0 && v > p * 3 / 2 && v - p > 50_000L }
-    if (growth != null) insights.add("\"${growth.first}\" kategoriyasi o'tgan oydan 1.5 baravardan ko'p oshgan.")
-    val breaches = data.limits.filter { (c, l) -> (byCat.firstOrNull { it.first == c }?.second ?: 0L) > l }
-    if (breaches.isNotEmpty()) insights.add("Limitdan oshgan kategoriyalar: ${breaches.keys.joinToString(", ")}.")
+    val totalLimit = data.limits[""] ?: 0L
+    if (totalLimit > 0L && expense > totalLimit) insights.add("Oylik xarajat limitidan ${formatMoney(expense - totalLimit)} oshgan.")
     if (monthTxns.isEmpty()) insights.add("Bu oyda yozuv yo'q.")
 
     if (showBudget) {
@@ -168,77 +166,10 @@ fun ReportScreen(
                     Spacer(Modifier.height(4.dp))
                     Text(formatMoney(biggest.amount), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Brand.expense)
                     Text(
-                        "${biggest.category} · ${Dates.format(biggest.date)}" + if (biggest.note.isNotBlank()) " · ${biggest.note}" else "",
+                        Dates.format(biggest.date) + if (biggest.note.isNotBlank()) " · ${biggest.note}" else "",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-            }
-        }
-        if (byCat.isNotEmpty()) {
-            item {
-                AppCard {
-                    Text("Kategoriyalar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(12.dp))
-                    byCat.forEach { (cat, value) ->
-                        val prev = prevByCat[cat] ?: 0L
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(cat, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                val share = if (expense > 0) value.toDouble() / expense.toDouble() * 100.0 else 0.0
-                                Text(
-                                    formatPercent(share) + " xarajatdan",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                Text(formatMoney(value), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                val d = value - prev
-                                if (prev > 0 || value > 0) {
-                                    Text(
-                                        (if (d > 0) "▲ " else if (d < 0) "▼ " else "") + formatMoney(Math.abs(d)),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (d > 0) Brand.expense else if (d < 0) Brand.income else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        ProgressBar(progress = if (expense > 0) value.toFloat() / expense.toFloat() else 0f, color = Brand.categoryColor(cat), height = 6.dp)
-                        Spacer(Modifier.height(14.dp))
-                    }
-                }
-            }
-        }
-        item {
-            val needsSpent = byCat.filter { it.first in Budget.needs }.sumOf { it.second }
-            val wantsSpent = expense - needsSpent
-            val saveSpent = Math.max(0L, remainder)
-            val savePct = 100 - data.budgetNeeds - data.budgetWants
-            AppCard {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Byudjet ${data.budgetNeeds}/${data.budgetWants}/$savePct",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    TextButton(onClick = { showBudget = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Sozlash") }
-                }
-                if (income <= 0L) {
-                    Text(
-                        "Byudjet daromadga nisbatan hisoblanadi. Bu oy daromad kiritilmagan.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    Spacer(Modifier.height(8.dp))
-                    BudgetLine("Zarur", needsSpent, income * data.budgetNeeds / 100, true)
-                    Spacer(Modifier.height(12.dp))
-                    BudgetLine("Xohish", wantsSpent, income * data.budgetWants / 100, true)
-                    Spacer(Modifier.height(12.dp))
-                    BudgetLine("Jamg'arma", saveSpent, income * savePct / 100, false)
                 }
             }
         }

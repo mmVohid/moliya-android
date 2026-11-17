@@ -86,7 +86,6 @@ fun CashFlowScreen(
     onSaveLimits: (Map<String, Long>) -> Unit,
     onAddTemplate: (Template) -> Unit,
     onDeleteTemplate: (Long) -> Unit,
-    onAddCategory: (Boolean, String) -> Unit,
 ) {
     var showLimits by remember { mutableStateOf(false) }
     var offset by rememberSaveable { mutableStateOf(0) }
@@ -135,7 +134,7 @@ fun CashFlowScreen(
                         Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            if (data.limits.isNotEmpty()) "Limit (${data.limits.size})" else "Limit",
+                            if ((data.limits[""] ?: 0L) > 0L) "Limit: " + formatMoney(data.limits[""] ?: 0L) else "Oylik limit",
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
@@ -217,7 +216,6 @@ fun CashFlowScreen(
             onSave = onAdd,
             onAddTemplate = onAddTemplate,
             onDeleteTemplate = onDeleteTemplate,
-            onAddCategory = onAddCategory,
         )
     }
 
@@ -231,14 +229,12 @@ fun CashFlowScreen(
             onSave = onUpdate,
             onAddTemplate = onAddTemplate,
             onDeleteTemplate = onDeleteTemplate,
-            onAddCategory = onAddCategory,
         )
     }
 
     if (showLimits) {
         LimitsSheet(
             limits = data.limits,
-            categories = data.expenseCategories,
             onSave = onSaveLimits,
             onDismiss = { showLimits = false },
         )
@@ -274,20 +270,20 @@ private fun SummaryTile(
 @Composable
 private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
-    val color = Brand.categoryColor(txn.category)
+    val color = if (txn.isIncome) Brand.income else Brand.expense
+    val title = if (txn.note.isNotBlank()) txn.note else if (txn.isIncome) "Daromad" else "Xarajat"
     val foreign = txn.currency != "UZS"
     val details = buildString {
         append(Dates.format(txn.date))
         if (foreign) append(" · ").append(formatForeign(txn.foreignAmount, txn.currency))
-        if (txn.note.isNotBlank()) append(" · ").append(txn.note)
     }
     AppCard(modifier = modifier, padding = 12.dp, onClick = onEdit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            LetterBadge(txn.category, color)
+            LetterBadge(if (txn.isIncome) "+" else "−", color)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    txn.category,
+                    title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -359,7 +355,6 @@ private fun TxnSheet(
     onSave: (Txn) -> Unit,
     onAddTemplate: (Template) -> Unit,
     onDeleteTemplate: (Long) -> Unit,
-    onAddCategory: (Boolean, String) -> Unit,
 ) {
     val context = LocalContext.current
     var isIncome by remember { mutableStateOf(initial?.isIncome ?: startIncome) }

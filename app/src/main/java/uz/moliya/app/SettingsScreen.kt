@@ -87,7 +87,6 @@ fun SettingsScreen(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () ->
         "notif" -> NotificationsPage(vm, back)
         "look" -> LookPage(vm, back)
         "data" -> DataPage(vm, onOpenBackup, back)
-        "cats" -> CategoriesPage(vm, back)
         "about" -> AboutPage(back)
         else -> SettingsHome(vm, onBack, onOpen = { page = it })
     }
@@ -236,7 +235,6 @@ private fun SettingsHome(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (Stri
                 NavRow(Icons.Rounded.Notifications, Color(0xFFE57C23), "Bildirishnomalar", if (notifCount == 0) "O'chiq" else "$notifCount ta yoqilgan") { onOpen("notif") }
                 NavRow(Icons.Rounded.Palette, Color(0xFF7B5EA7), "Ko'rinish", listOf("Tizim", "Yorug'", "Qorong'i")[s.theme.coerceIn(0, 2)]) { onOpen("look") }
                 NavRow(Icons.Rounded.Storage, Color(0xFF2F80ED), "Ma'lumotlar va zaxira", if (s.autoBackup) "Avto: yoqilgan" else "Avto: o'chiq") { onOpen("data") }
-                NavRow(Icons.Rounded.Category, Color(0xFFD94F70), "Kategoriyalar", "${data.expenseCategories.size + data.incomeCategories.size} ta") { onOpen("cats") }
                 NavRow(Icons.Rounded.Info, Color(0xFF6B7280), "Ilova haqida", "v${BuildConfig.VERSION_NAME}") { onOpen("about") }
             }
         }
@@ -688,98 +686,6 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                 ) { Text("Hammasini o'chirish", color = Brand.expense) }
             },
             dismissButton = { TextButton(onClick = { typeWipe = false }) { Text("Bekor qilish") } },
-        )
-    }
-}
-
-// ───────────────────────── Kategoriyalar ─────────────────────────
-
-@Composable
-private fun CategoriesPage(vm: FinanceViewModel, onBack: () -> Unit) {
-    var income by rememberSaveable { mutableStateOf(false) }
-    var rename by remember { mutableStateOf<String?>(null) }
-    var adding by remember { mutableStateOf(false) }
-    var delete by remember { mutableStateOf<String?>(null) }
-    val list = if (income) vm.data.incomeCategories else vm.data.expenseCategories
-
-    Page("Kategoriyalar", onBack) {
-        item {
-            SegmentedToggle(options = listOf("Xarajat", "Daromad"), selected = if (income) 1 else 0, onSelect = { income = it == 1 })
-        }
-        item { BigButton(text = "Yangi kategoriya", icon = Icons.Rounded.Add, onClick = { adding = true }, modifier = Modifier.fillMaxWidth()) }
-        list.forEachIndexed { index, name ->
-            item(key = (if (income) "i" else "e") + name) {
-                AppCard(padding = 8.dp) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            name,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Medium,
-                        )
-                        IconButton(onClick = { vm.moveCategory(income, name, -1) }, enabled = index > 0, modifier = Modifier.size(44.dp)) {
-                            Icon(Icons.Rounded.ArrowUpward, contentDescription = "Yuqoriga")
-                        }
-                        IconButton(onClick = { vm.moveCategory(income, name, 1) }, enabled = index < list.lastIndex, modifier = Modifier.size(44.dp)) {
-                            Icon(Icons.Rounded.ArrowDownward, contentDescription = "Pastga")
-                        }
-                        IconButton(onClick = { rename = name }, modifier = Modifier.size(44.dp)) {
-                            Icon(Icons.Rounded.Edit, contentDescription = "Nomini o'zgartirish")
-                        }
-                        IconButton(onClick = { delete = name }, enabled = list.size > 1, modifier = Modifier.size(44.dp)) {
-                            Icon(Icons.Rounded.Delete, contentDescription = "O'chirish", tint = Brand.expense)
-                        }
-                    }
-                }
-            }
-        }
-        item { Hint("Nomni o'zgartirsangiz, eski yozuvlar ham yangi nomga o'tadi. Kategoriyani o'chirsangiz, eski yozuvlar o'z nomida qoladi.") }
-    }
-
-    if (adding) {
-        var text by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { adding = false },
-            title = { Text("Yangi kategoriya") },
-            text = { OutlinedTextField(value = text, onValueChange = { text = it.take(24) }, label = { Text("Nomi") }, singleLine = true, shape = RoundedCornerShape(14.dp)) },
-            confirmButton = {
-                TextButton(enabled = text.isNotBlank(), onClick = {
-                    vm.addCategory(income, text)
-                    adding = false
-                }) { Text("Qo'shish") }
-            },
-            dismissButton = { TextButton(onClick = { adding = false }) { Text("Bekor qilish") } },
-        )
-    }
-    val old = rename
-    if (old != null) {
-        var text by remember(old) { mutableStateOf(old) }
-        AlertDialog(
-            onDismissRequest = { rename = null },
-            title = { Text("Nomini o'zgartirish") },
-            text = { OutlinedTextField(value = text, onValueChange = { text = it.take(24) }, label = { Text("Yangi nom") }, singleLine = true, shape = RoundedCornerShape(14.dp)) },
-            confirmButton = {
-                TextButton(enabled = text.isNotBlank(), onClick = {
-                    vm.renameCategory(income, old, text)
-                    rename = null
-                }) { Text("Saqlash") }
-            },
-            dismissButton = { TextButton(onClick = { rename = null }) { Text("Bekor qilish") } },
-        )
-    }
-    val del = delete
-    if (del != null) {
-        ConfirmDialog(
-            title = "Kategoriyani o'chirish",
-            text = "\"$del\" ro'yxatdan olib tashlanadi. Eski yozuvlar o'z nomida qoladi.",
-            confirmLabel = "O'chirish",
-            onConfirm = {
-                vm.deleteCategory(income, del)
-                delete = null
-            },
-            onDismiss = { delete = null },
         )
     }
 }
