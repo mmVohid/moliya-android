@@ -28,7 +28,6 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             data = migrated
             Storage.save(getApplication<Application>(), migrated)
         }
-        applyRecurring()
         // Mavjud foydalanuvchi uchun zaxira eslatmasi hisobi bugundan boshlanadi
         if (!data.isEmpty && settings.firstEntryAt == 0L) {
             updateSettings(settings.copy(firstEntryAt = System.currentTimeMillis()))
@@ -97,23 +96,6 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun consumeQuickAdd() {
         quickAdd = 0
-    }
-
-    // ───── Takroriy yozuvlar ─────
-    fun addRecurring(r: Recurring) {
-        update { it.copy(recurring = it.recurring + r) }
-        applyRecurring()
-    }
-
-    fun deleteRecurring(id: Long) = update { d -> d.copy(recurring = d.recurring.filterNot { it.id == id }) }
-
-    /** Muddati kelgan takroriy yozuvlarni qo'shadi (ilova ochilganda va yangi yozuv qo'shilganda). */
-    fun applyRecurring() {
-        val next = Recurrence.apply(data, Dates.today())
-        if (next !== data) {
-            data = next
-            Storage.save(getApplication<Application>(), next)
-        }
     }
 
     // ───── Limitlar ─────

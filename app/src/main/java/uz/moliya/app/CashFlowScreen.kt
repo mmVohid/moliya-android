@@ -32,12 +32,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -79,14 +79,11 @@ fun CashFlowScreen(
     onAdd: (Txn) -> Unit,
     onUpdate: (Txn) -> Unit,
     onDelete: (Txn) -> Unit,
-    onAddRecurring: (Recurring) -> Unit,
-    onDeleteRecurring: (Long) -> Unit,
     onSaveLimits: (Map<String, Long>) -> Unit,
     onAddTemplate: (Template) -> Unit,
     onDeleteTemplate: (Long) -> Unit,
     onAddCategory: (Boolean, String) -> Unit,
 ) {
-    var showRecurring by remember { mutableStateOf(false) }
     var showLimits by remember { mutableStateOf(false) }
     var offset by rememberSaveable { mutableStateOf(0) }
     var filter by rememberSaveable { mutableStateOf(0) }
@@ -120,7 +117,26 @@ fun CashFlowScreen(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { ScreenHeader("Daromad / Xarajat", "Pul oqimini kuzatib boring") }
+            item {
+                Box(Modifier.fillMaxWidth()) {
+                    ScreenHeader("Daromad / Xarajat", "Pul oqimini kuzatib boring")
+                    FilledTonalButton(
+                        onClick = { showLimits = true },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 20.dp)
+                            .heightIn(min = 48.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp),
+                    ) {
+                        Icon(Icons.Rounded.Tune, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (data.limits.isNotEmpty()) "Limit (${data.limits.size})" else "Limit",
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
 
             run {
                 item {
@@ -136,23 +152,6 @@ fun CashFlowScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         SummaryTile("Daromad", data.income(start, end), Brand.income, Icons.Rounded.TrendingUp, Modifier.weight(1f))
                         SummaryTile("Xarajat", data.expense(start, end), Brand.expense, Icons.Rounded.TrendingDown, Modifier.weight(1f))
-                    }
-                }
-
-                item {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        OutlineBigButton(
-                            text = "Takroriy" + if (data.recurring.isNotEmpty()) " (${data.recurring.size})" else "",
-                            icon = Icons.Rounded.Repeat,
-                            onClick = { showRecurring = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlineBigButton(
-                            text = "Limitlar" + if (data.limits.isNotEmpty()) " (${data.limits.size})" else "",
-                            icon = Icons.Rounded.Tune,
-                            onClick = { showLimits = true },
-                            modifier = Modifier.weight(1f),
-                        )
                     }
                 }
 
@@ -223,17 +222,6 @@ fun CashFlowScreen(
             onAddTemplate = onAddTemplate,
             onDeleteTemplate = onDeleteTemplate,
             onAddCategory = onAddCategory,
-        )
-    }
-
-    if (showRecurring) {
-        RecurringSheet(
-            items = data.recurring,
-            expenseCats = data.expenseCategories,
-            incomeCats = data.incomeCategories,
-            onAdd = onAddRecurring,
-            onDelete = onDeleteRecurring,
-            onDismiss = { showRecurring = false },
         )
     }
 

@@ -120,7 +120,6 @@ class MainActivity : FragmentActivity() {
         vm.refreshSettings()
         // Fonda 15 soniyadan ortiq turgan bo'lsa, qayta qulflaymiz
         if (stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > 15_000L) vm.lock()
-        vm.applyRecurring()
     }
 
     companion object {
@@ -315,8 +314,6 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         vm.deleteTxn(txn.id)
                         undoable("Yozuv o'chirildi") { vm.restoreTxn(txn) }
                     },
-                    onAddRecurring = vm::addRecurring,
-                    onDeleteRecurring = vm::deleteRecurring,
                     onSaveLimits = vm::setLimits,
                     onAddTemplate = vm::addTemplate,
                     onDeleteTemplate = vm::deleteTemplate,
