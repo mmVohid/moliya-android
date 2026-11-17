@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package uz.moliya.app
 
 import androidx.compose.foundation.layout.Arrangement
