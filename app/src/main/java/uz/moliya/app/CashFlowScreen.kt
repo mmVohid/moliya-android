@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalLayoutApi::class)
+@file:OptIn(ExperimentalLayoutApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package uz.moliya.app
 
@@ -39,6 +39,12 @@ import androidx.compose.material.icons.rounded.TrendingDown
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -369,7 +375,6 @@ private fun TxnSheet(
     var saveAsTemplate by remember { mutableStateOf(false) }
     var walletId by remember { mutableStateOf(initial?.walletId ?: 0L) }
     var receipt by remember { mutableStateOf(initial?.receipt ?: "") }
-    var newCategory by remember { mutableStateOf<String?>(null) }
     var cameraTarget by remember { mutableStateOf<Pair<java.io.File, android.net.Uri>?>(null) }
     val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) Receipts.save(context, uri)?.let { receipt = it }
@@ -448,6 +453,23 @@ private fun TxnSheet(
             }
         }
 
+        // 1. Summa
+        if (foreign) {
+            OutlinedTextField(
+                value = amount,
+                onValueChange = { amount = filterDecimal(it) },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Summa ($currency)") },
+                suffix = { Text(currency) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(14.dp),
+            )
+        } else {
+            MoneyField(value = amount, onChange = { amount = it }, label = "Summa")
+        }
+
+        // 2. Valyuta turi
         SegmentedToggle(
             options = Currencies.all.map { if (it == "UZS") "So'm" else it },
             selected = Currencies.all.indexOf(currency).coerceAtLeast(0),
@@ -460,65 +482,94 @@ private fun TxnSheet(
                 }
             },
         )
-
         if (foreign) {
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = filterDecimal(it) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Summa ($currency)") },
-                suffix = { Text(currency) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(14.dp),
-            )
             OutlinedTextField(
                 value = rate,
                 onValueChange = { rate = filterDecimal(it) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Kurs (1 $currency necha so'm)") },
                 suffix = { Text("so'm") },
-                supportingText = {
-                    if (amountUzs > 0) Text("= ${formatMoney(amountUzs)}")
-                },
+                supportingText = { if (amountUzs > 0) Text("= ${formatMoney(amountUzs)}") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                 shape = RoundedCornerShape(14.dp),
             )
-        } else {
-            MoneyField(value = amount, onChange = { amount = it }, label = "Summa")
         }
 
-        Text("Kategoriya", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        CategoryChips(categories = categories, selected = category, onSelect = { category = it })
-        val adding = newCategory
-        if (adding == null) {
-            TextButton(onClick = { newCategory = "" }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Yangi kategoriya")
-            }
-        } else {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = adding,
-                    onValueChange = { newCategory = it.take(20) },
-                    modifier = Modifier.weight(1f),
-                    label = { Text("Kategoriya nomi") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(14.dp),
-                )
-                TextButton(
-                    enabled = adding.isNotBlank(),
+        // 3. Izoh (ixtiyoriy)
+        NoteField(value = note, onChange = { note = it })
+
+        // 4. Sana
+        DateField(millis = date, onChange = { date = it })
+
+        // 5. Kategoriya (ro'yxat + Yangi kategoriya)
+        var menuOpen by remember { mutableStateOf(false) }
+        var showNewCategory by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded = menuOpen, onExpandedChange = { menuOpen = it }) {
+            OutlinedTextField(
+                value = category,
+                onValueChange = {},
+                readOnly = true,
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
+                label = { Text("Kategoriya") },
+                placeholder = { Text("Tanlang") },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = menuOpen) },
+                shape = RoundedCornerShape(14.dp),
+            )
+            ExposedDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                categories.forEach { c ->
+                    DropdownMenuItem(
+                        text = { Text(c, style = MaterialTheme.typography.bodyLarge) },
+                        onClick = {
+                            category = c
+                            menuOpen = false
+                        },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    )
+                }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = {
+                        Text("+ Yangi kategoriya", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    },
                     onClick = {
-                        onAddCategory(isIncome, adding)
-                        category = adding.trim()
-                        newCategory = null
+                        menuOpen = false
+                        showNewCategory = true
                     },
                     modifier = Modifier.heightIn(min = 48.dp),
-                ) { Text("Qo'shish") }
+                )
             }
         }
+        if (showNewCategory) {
+            var name by remember { mutableStateOf("") }
+            AlertDialog(
+                onDismissRequest = { showNewCategory = false },
+                title = { Text("Yangi kategoriya") },
+                text = {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it.take(24) },
+                        label = { Text("Kategoriya nomi") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        enabled = name.isNotBlank(),
+                        onClick = {
+                            onAddCategory(isIncome, name)
+                            category = name.trim()
+                            showNewCategory = false
+                        },
+                    ) { Text("Qo'shish") }
+                },
+                dismissButton = { TextButton(onClick = { showNewCategory = false }) { Text("Bekor qilish") } },
+            )
+        }
+
         if (data.wallets.isNotEmpty()) {
             Text("Hamyon", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -528,15 +579,18 @@ private fun TxnSheet(
                 }
             }
         }
-        NoteField(value = note, onChange = { note = it })
-        DateField(millis = date, onChange = { date = it })
 
-        Text("Chek rasmi", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        // 6. Chek rasmi (daromadda: Ilova qilish)
+        Text(
+            if (isIncome) "Ilova qilish" else "Chek rasmi",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
         val preview = remember(receipt) { Receipts.load(context, receipt) }
         if (preview != null) {
             androidx.compose.foundation.Image(
                 bitmap = preview,
-                contentDescription = "Chek rasmi",
+                contentDescription = if (isIncome) "Ilova qilingan rasm" else "Chek rasmi",
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = 220.dp)
@@ -583,6 +637,7 @@ private fun TxnSheet(
             }
         }
 
+        // 7. Saqlash
         BigButton(
             text = "Saqlash",
             enabled = canSave,
