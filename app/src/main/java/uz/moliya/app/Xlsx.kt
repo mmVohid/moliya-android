@@ -169,7 +169,7 @@ object XlsxExporter {
 
     private fun limitSheet(d: FinanceData): Sheet {
         val rows = mutableListOf<List<Any>>(listOf("Kategoriya", "Oylik limit (so'm)"))
-        for ((category, amount) in d.limits) rows.add(listOf(category, amount))
+        for ((category, amount) in d.limits) rows.add(listOf(if (category.isEmpty()) "Umumiy" else category, amount))
         return Sheet("Limitlar", listOf(26, 20), rows)
     }
 

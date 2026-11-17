@@ -2,6 +2,9 @@
 
 package uz.moliya.app
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.Widgets
@@ -587,6 +590,9 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
     var confirmWipe by remember { mutableStateOf(false) }
     var typeWipe by remember { mutableStateOf(false) }
     var advanced by rememberSaveable { mutableStateOf(false) }
+    var working by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) { vm.refreshSettings() }
     val keeps = listOf(2, 4, 8, 12)
     val weekdays = listOf(0 to "Avto", 2 to "Du", 3 to "Se", 4 to "Ch", 5 to "Pa", 6 to "Ju", 7 to "Sh", 1 to "Ya")
     val data = vm.data
@@ -643,8 +649,27 @@ private fun DataPage(vm: FinanceViewModel, onOpenBackup: () -> Unit, onBack: () 
                     )
                 }
                 if (s.backupFolder.isNotEmpty()) {
-                    TextButton(onClick = { folderLauncher.launch(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                        Text("Papkani o'zgartirish", fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { folderLauncher.launch(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                            Text("Papkani o'zgartirish", fontWeight = FontWeight.SemiBold)
+                        }
+                        TextButton(
+                            enabled = !working,
+                            onClick = {
+                                working = true
+                                scope.launch {
+                                    val error = withContext(Dispatchers.IO) { AutoBackup.backupNow(context) }
+                                    vm.refreshSettings()
+                                    working = false
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        error ?: "Zaxira papkaga saqlandi",
+                                        android.widget.Toast.LENGTH_LONG,
+                                    ).show()
+                                }
+                            },
+                            modifier = Modifier.heightIn(min = 48.dp),
+                        ) { Text(if (working) "Saqlanmoqda..." else "Hozir zaxira olish", fontWeight = FontWeight.SemiBold) }
                     }
                 }
                 if (s.autoBackup) {

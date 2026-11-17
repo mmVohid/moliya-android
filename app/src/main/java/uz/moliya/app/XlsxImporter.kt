@@ -144,7 +144,7 @@ object XlsxImporter {
         val limits = LinkedHashMap<String, Long>()
         for (r in sheets["Limitlar"].dataRows()) {
             val amount = num(r.col(1))
-            if (r.col(0).isNotEmpty() && amount > 0L) limits[r.col(0)] = amount
+            if (r.col(0).isNotEmpty() && amount > 0L) limits[if (r.col(0) == "Umumiy") "" else r.col(0)] = amount
         }
 
         val recurring = sheets["Takroriy"].dataRows().mapNotNull { r ->

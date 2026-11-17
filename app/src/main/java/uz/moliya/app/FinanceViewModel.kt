@@ -316,7 +316,12 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAutoBackup(on: Boolean) {
         updateSettings(settings.copy(autoBackup = on))
-        if (on) AutoBackup.schedule(getApplication<Application>()) else AutoBackup.cancel(getApplication<Application>())
+        if (on) {
+            AutoBackup.schedule(getApplication<Application>())
+            if (settings.backupFolder.isNotEmpty()) AutoBackup.runOnce(getApplication<Application>())
+        } else {
+            AutoBackup.cancel(getApplication<Application>())
+        }
     }
 
     fun setReminders(on: Boolean) {

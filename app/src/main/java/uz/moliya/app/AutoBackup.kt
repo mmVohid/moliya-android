@@ -68,6 +68,24 @@ object AutoBackup {
         )
     }
 
+    /** Hozir zaxira oladi. Xato bo'lsa, sababini matn sifatida qaytaradi (muvaffaqiyatda null). */
+    fun backupNow(context: Context): String? {
+        val settings = Prefs.load(context)
+        if (settings.backupFolder.isEmpty()) return "Avval zaxira papkasini tanlang."
+        return try {
+            runNow(context, settings.backupFolder)
+            Prefs.setLastAutoBackup(context, System.currentTimeMillis())
+            null
+        } catch (e: Exception) {
+            e.message ?: "Noma'lum xato. Papkani qayta tanlab ko'ring."
+        }
+    }
+
+    /** Yoqilgan zahoti birinchi nusxani oladi, haftalik jadval esa keyin ishlaydi. */
+    fun runOnce(context: Context) {
+        WorkManager.getInstance(context).enqueue(androidx.work.OneTimeWorkRequestBuilder<AutoBackupWorker>().build())
+    }
+
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
