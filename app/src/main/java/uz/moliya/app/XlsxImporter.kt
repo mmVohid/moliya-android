@@ -333,7 +333,7 @@ object XlsxImporter {
                 var rid = ""
                 for (i in 0 until p.attributeCount) {
                     val attr = p.getAttributeName(i)
-                    if (attr == "r:id" || attr.endsWith(":id")) rid = p.getAttributeValue(i)
+                    if (attr == "id" || attr == "r:id" || attr.endsWith(":id")) rid = p.getAttributeValue(i)
                 }
                 if (name.isNotEmpty() && rid.isNotEmpty()) out.add(name to rid)
             }
