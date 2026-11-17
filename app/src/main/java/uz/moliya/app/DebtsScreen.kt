@@ -88,7 +88,7 @@ fun DebtsScreen(
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp + LocalBottomInset.current),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item { ScreenHeader("Qarzlar nazorati", "Olgan va bergan qarzlaringizni yozib boring") }
@@ -151,7 +151,9 @@ fun DebtsScreen(
                     EmptyState(
                         icon = Icons.Rounded.CreditCard,
                         title = if (data.debts.isEmpty()) "Qarzlar yo'q" else "Bu bo'limda qarz yo'q",
-                        text = "\"Qarz qo'shish\" tugmasi orqali olgan yoki bergan qarzingizni kiriting va qaytarilishini kuzating.",
+                        text = "Olgan yoki bergan qarzingizni kiriting va qaytarilishini kuzating.",
+                        actionText = "Qarz qo'shish",
+                        onAction = { showAdd = true },
                     )
                 }
             } else {
@@ -172,7 +174,7 @@ fun DebtsScreen(
             onClick = { showAdd = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + LocalBottomInset.current),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             icon = { Icon(Icons.Rounded.Add, contentDescription = null) },

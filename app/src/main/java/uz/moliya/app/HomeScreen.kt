@@ -1,5 +1,9 @@
 package uz.moliya.app
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.CalendarMonth
@@ -90,7 +94,7 @@ fun HomeScreen(
     val staleDays = ((System.currentTimeMillis() - reference) / (24L * 60 * 60 * 1000)).toInt()
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + LocalBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
@@ -237,10 +241,14 @@ fun HomeScreen(
                     LegendDot("Xarajat", Brand.expense)
                 }
                 Spacer(Modifier.height(16.dp))
-                DualBarChart(incomes, expenses, labels)
+                val details = offsets.mapIndexed { i, off ->
+                    if (data.hideBalance) Dates.monthLabel(off) + ": •••••••"
+                    else Dates.monthLabel(off) + ":  +" + formatMoney(incomes[i]) + "   −" + formatMoney(expenses[i])
+                }
+                DualBarChart(incomes, expenses, labels, details)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Oldingi oylarni ko'rish uchun grafikni chapga suring",
+                    "Oy ustiga bosing: tafsilot yuqorida ko'rinadi. Oldingi oylar uchun chapga suring.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -304,7 +312,7 @@ private fun HeroCard(
             }
             Column(Modifier.padding(end = 12.dp)) {
                 Text(
-                    maskedMoney(balance, hidden),
+                    if (hidden) maskedMoney(0L, true) else formatMoney(animatedLong(balance)),
                     fontSize = 32.sp,
                     lineHeight = 40.sp,
                     fontWeight = FontWeight.Bold,
@@ -334,7 +342,7 @@ private fun HeroStat(label: String, value: Long, hidden: Boolean, modifier: Modi
         Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
         Spacer(Modifier.height(2.dp))
         Text(
-            maskedMoney(value, hidden),
+            if (hidden) maskedMoney(0L, true) else formatMoney(animatedLong(value)),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.Bold,
             color = Color.White,
@@ -363,11 +371,18 @@ private fun LegendDot(text: String, color: Color) {
 }
 
 @Composable
-private fun DualBarChart(income: List<Long>, expense: List<Long>, labels: List<String>) {
+private fun DualBarChart(income: List<Long>, expense: List<Long>, labels: List<String>, details: List<String>) {
+    var selected by remember { mutableStateOf(labels.lastIndex) }
     val maxValue = maxOf(1L, income.maxOrNull() ?: 0L, expense.maxOrNull() ?: 0L)
     val scroll = rememberScrollState()
     // Joriy oy (o'ngdagi) ko'rinib turishi uchun oxirigacha suramiz
     LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    Text(
+        details.getOrElse(selected) { "" },
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Spacer(Modifier.height(10.dp))
     Row(
         Modifier
             .fillMaxWidth()
@@ -379,7 +394,10 @@ private fun DualBarChart(income: List<Long>, expense: List<Long>, labels: List<S
             Column(
                 Modifier
                     .width(40.dp)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (i == selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent)
+                    .clickable { selected = i },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -421,7 +439,7 @@ private fun RowScope.Bar(value: Long, maxValue: Long, color: Color) {
                 .width(10.dp)
                 .fillMaxHeight(fraction)
                 .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
-                .background(color),
+                .background(Brush.verticalGradient(listOf(color, color.copy(alpha = 0.6f)))),
         )
     }
 }

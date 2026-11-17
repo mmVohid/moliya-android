@@ -80,7 +80,7 @@ fun CushionScreen(
     val history = data.cushion.sortedWith(compareByDescending<CushionEntry> { it.date }.thenByDescending { it.id })
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + LocalBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {

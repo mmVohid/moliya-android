@@ -22,6 +22,8 @@ data class AppSettings(
     val secureScreen: Boolean = false,
     /** Birinchi sozlash takliflari ko'rsatilganmi */
     val onboarded: Boolean = false,
+    /** Android 12+: ilova rangi fon rasmiga moslashadi */
+    val dynamicColor: Boolean = false,
     /** Birinchi yozuv kiritilgan vaqt (zaxira eslatmasi shundan hisoblanadi) */
     val firstEntryAt: Long = 0L,
 ) {
@@ -44,6 +46,7 @@ object Prefs {
             lastAutoBackup = sp.getLong("lastAutoBackup", 0L),
             secureScreen = sp.getBoolean("secureScreen", false),
             onboarded = sp.getBoolean("onboarded", false),
+            dynamicColor = sp.getBoolean("dynamicColor", false),
             firstEntryAt = sp.getLong("firstEntryAt", 0L),
         )
     }
@@ -60,6 +63,7 @@ object Prefs {
             .putLong("lastAutoBackup", s.lastAutoBackup)
             .putBoolean("secureScreen", s.secureScreen)
             .putBoolean("onboarded", s.onboarded)
+            .putBoolean("dynamicColor", s.dynamicColor)
             .putLong("firstEntryAt", s.firstEntryAt)
             .apply()
     }

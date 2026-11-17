@@ -51,6 +51,7 @@ fun SettingsScreen(
     onAutoBackup: (Boolean) -> Unit,
     onPickFolder: (String) -> Unit,
     onSecureScreen: (Boolean) -> Unit,
+    onDynamicColor: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -165,6 +166,20 @@ fun SettingsScreen(
                     selected = settings.theme,
                     onSelect = onTheme,
                 )
+            }
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            item {
+                AppCard {
+                    SwitchRow(
+                        title = "Dinamik rang",
+                        subtitle = "Ilova rangi telefon fon rasmiga moslashadi",
+                        checked = settings.dynamicColor,
+                        enabled = true,
+                        onChange = onDynamicColor,
+                    )
+                }
             }
         }
 

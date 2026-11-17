@@ -83,6 +83,8 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         else if (income) d.copy(customIncome = d.customIncome + n) else d.copy(customExpense = d.customExpense + n)
     }
 
+    fun setDynamicColor(on: Boolean) = updateSettings(settings.copy(dynamicColor = on))
+
     fun setSecureScreen(on: Boolean) = updateSettings(settings.copy(secureScreen = on))
 
     // ───── Shablonlar ─────

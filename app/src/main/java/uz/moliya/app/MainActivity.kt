@@ -1,5 +1,15 @@
 package uz.moliya.app
 
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
@@ -75,7 +85,7 @@ class MainActivity : FragmentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 onDispose { }
             }
-            MoliyaTheme(dark = dark) {
+            MoliyaTheme(dark = dark, dynamic = settings.dynamicColor) {
                 if (vm.locked) {
                     LockScreen(
                         verify = vm::verifyPin,
@@ -153,6 +163,7 @@ fun MoliyaApp(vm: FinanceViewModel) {
     val scope = rememberCoroutineScope()
     val data = vm.data
 
+    val hapticRef = LocalHapticFeedback.current
     val notify: (String) -> Unit = { message ->
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
@@ -160,6 +171,7 @@ fun MoliyaApp(vm: FinanceViewModel) {
         }
     }
     val undoable: (String, () -> Unit) -> Unit = { message, restore ->
+        hapticRef.performHapticFeedback(HapticFeedbackType.LongPress)
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
             val result = snackbar.showSnackbar(
@@ -214,6 +226,7 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onAutoBackup = vm::setAutoBackup,
                         onPickFolder = vm::setBackupFolder,
                         onSecureScreen = vm::setSecureScreen,
+                        onDynamicColor = vm::setDynamicColor,
                         onBack = { showSettings = false },
                     )
                 } else if (showReport) {
@@ -240,124 +253,137 @@ fun MoliyaApp(vm: FinanceViewModel) {
         return
     }
 
+    val density = LocalDensity.current
+    var navHeight by remember { mutableStateOf(80.dp) }
+    val haptic = LocalHapticFeedback.current
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbar) },
-        bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                tabs.forEachIndexed { index, item ->
-                    NavigationBarItem(
-                        selected = tab == index,
-                        onClick = { tab = index },
-                        icon = { Icon(item.icon, contentDescription = null) },
-                        label = {
-                            Text(
-                                item.label,
-                                maxLines = 1,
-                                fontWeight = if (tab == index) FontWeight.Bold else FontWeight.Medium,
-                            )
+        contentWindowInsets = WindowInsets.statusBars,
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
+            CompositionLocalProvider(LocalBottomInset provides navHeight) {
+                when (tab) {
+                    0 -> HomeScreen(
+                        data = data,
+                        onOpenTab = { tab = it },
+                        onToggleHide = { vm.setHideBalance(!data.hideBalance) },
+                        onOpenSettings = { showSettings = true },
+                        lastBackupAt = vm.lastBackupAt,
+                        autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
+                        firstEntryAt = vm.settings.firstEntryAt,
+                        onQuickAdd = { income ->
+                            vm.requestQuickAdd(income)
                         },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = MaterialTheme.colorScheme.primary,
-                            selectedTextColor = MaterialTheme.colorScheme.primary,
-                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        ),
+                        onOpenReport = { showReport = true },
+                        onOpenNetWorth = { showNet = true },
+                        onOpenYear = { showYear = true },
+                    )
+                    1 -> CashFlowScreen(
+                        data = data,
+                        quickAdd = vm.quickAdd,
+                        onQuickAddConsumed = vm::consumeQuickAdd,
+                        onAdd = { txn ->
+                            val before = data
+                            vm.addTxn(txn)
+                            warnIfOverLimit(before, txn, notify)
+                            if (txn.isIncome && before.saveRate > 0) {
+                                val part = txn.amount * before.saveRate / 100
+                                if (part > 0 && (before.monthlyNeed > 0 || before.goals.isNotEmpty())) {
+                                    undoableAction(
+                                        "Jamg'armaga ${formatMoney(part)} ajrating (${before.saveRate}%)",
+                                        "Ajratish",
+                                    ) {
+                                        val entry = CushionEntry(Ids.next(), part, "Daromaddan ajratma", Dates.today())
+                                        val goal = before.goals.firstOrNull { it.remaining > 0 }
+                                        if (before.monthlyNeed > 0) vm.addCushion(entry)
+                                        else if (goal != null) vm.addGoalEntry(goal.id, entry)
+                                    }
+                                }
+                            }
+                        },
+                        onUpdate = vm::updateTxn,
+                        onDelete = { txn ->
+                            vm.deleteTxn(txn.id)
+                            undoable("Yozuv o'chirildi") { vm.restoreTxn(txn) }
+                        },
+                        onSaveLimits = vm::setLimits,
+                        onAddTemplate = vm::addTemplate,
+                        onDeleteTemplate = vm::deleteTemplate,
+                        onAddCategory = vm::addCategory,
+                    )
+                    2 -> SavingsHost(
+                        data = data,
+                        onPlan = vm::setPlan,
+                        onAddCushion = vm::addCushion,
+                        onDeleteCushion = { e ->
+                            vm.deleteCushion(e.id)
+                            undoable("Yozuv o'chirildi") { vm.restoreCushion(e) }
+                        },
+                        onAddGoal = vm::addGoal,
+                        onDeleteGoal = { g ->
+                            vm.deleteGoal(g.id)
+                            undoable("\"${g.name}\" o'chirildi") { vm.restoreGoal(g) }
+                        },
+                        onAddGoalEntry = vm::addGoalEntry,
+                        onDeleteGoalEntry = { goalId, e ->
+                            vm.deleteGoalEntry(goalId, e.id)
+                            undoable("Yozuv o'chirildi") { vm.restoreGoalEntry(goalId, e) }
+                        },
+                    )
+                    3 -> DebtsScreen(
+                        data = data,
+                        onAddDebt = vm::addDebt,
+                        onDeleteDebt = { debt ->
+                            vm.deleteDebt(debt.id)
+                            undoable("\"${debt.name}\" qarzi o'chirildi") { vm.restoreDebt(debt) }
+                        },
+                        onPay = vm::addPayment,
+                        onDeletePayment = { debtId, payment ->
+                            vm.deletePayment(debtId, payment.id)
+                            undoable("To'lov o'chirildi") { vm.restorePayment(debtId, payment) }
+                        },
+                    )
+                    else -> BackupScreen(
+                        data = data,
+                        onBackedUp = vm::markBackup,
+                        onRestore = vm::replaceData,
+                        notify = notify,
                     )
                 }
             }
-        },
-    ) { padding ->
-        Box(Modifier.padding(padding)) {
-            when (tab) {
-                0 -> HomeScreen(
-                    data = data,
-                    onOpenTab = { tab = it },
-                    onToggleHide = { vm.setHideBalance(!data.hideBalance) },
-                    onOpenSettings = { showSettings = true },
-                    lastBackupAt = vm.lastBackupAt,
-                    autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
-                    firstEntryAt = vm.settings.firstEntryAt,
-                    onQuickAdd = { income ->
-                        vm.requestQuickAdd(income)
+            Box(Modifier.align(Alignment.BottomCenter)) {
+        NavigationBar(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
+            modifier = Modifier.onSizeChanged { navHeight = with(density) { it.height.toDp() } },
+        ) {
+            tabs.forEachIndexed { index, item ->
+                NavigationBarItem(
+                    selected = tab == index,
+                    onClick = { tab = index },
+                    icon = { Icon(item.icon, contentDescription = null) },
+                    label = {
+                        Text(
+                            item.label,
+                            maxLines = 1,
+                            fontWeight = if (tab == index) FontWeight.Bold else FontWeight.Medium,
+                        )
                     },
-                    onOpenReport = { showReport = true },
-                    onOpenNetWorth = { showNet = true },
-                    onOpenYear = { showYear = true },
-                )
-                1 -> CashFlowScreen(
-                    data = data,
-                    quickAdd = vm.quickAdd,
-                    onQuickAddConsumed = vm::consumeQuickAdd,
-                    onAdd = { txn ->
-                        val before = data
-                        vm.addTxn(txn)
-                        warnIfOverLimit(before, txn, notify)
-                        if (txn.isIncome && before.saveRate > 0) {
-                            val part = txn.amount * before.saveRate / 100
-                            if (part > 0 && (before.monthlyNeed > 0 || before.goals.isNotEmpty())) {
-                                undoableAction(
-                                    "Jamg'armaga ${formatMoney(part)} ajrating (${before.saveRate}%)",
-                                    "Ajratish",
-                                ) {
-                                    val entry = CushionEntry(Ids.next(), part, "Daromaddan ajratma", Dates.today())
-                                    val goal = before.goals.firstOrNull { it.remaining > 0 }
-                                    if (before.monthlyNeed > 0) vm.addCushion(entry)
-                                    else if (goal != null) vm.addGoalEntry(goal.id, entry)
-                                }
-                            }
-                        }
-                    },
-                    onUpdate = vm::updateTxn,
-                    onDelete = { txn ->
-                        vm.deleteTxn(txn.id)
-                        undoable("Yozuv o'chirildi") { vm.restoreTxn(txn) }
-                    },
-                    onSaveLimits = vm::setLimits,
-                    onAddTemplate = vm::addTemplate,
-                    onDeleteTemplate = vm::deleteTemplate,
-                    onAddCategory = vm::addCategory,
-                )
-                2 -> SavingsHost(
-                    data = data,
-                    onPlan = vm::setPlan,
-                    onAddCushion = vm::addCushion,
-                    onDeleteCushion = { e ->
-                        vm.deleteCushion(e.id)
-                        undoable("Yozuv o'chirildi") { vm.restoreCushion(e) }
-                    },
-                    onAddGoal = vm::addGoal,
-                    onDeleteGoal = { g ->
-                        vm.deleteGoal(g.id)
-                        undoable("\"${g.name}\" o'chirildi") { vm.restoreGoal(g) }
-                    },
-                    onAddGoalEntry = vm::addGoalEntry,
-                    onDeleteGoalEntry = { goalId, e ->
-                        vm.deleteGoalEntry(goalId, e.id)
-                        undoable("Yozuv o'chirildi") { vm.restoreGoalEntry(goalId, e) }
-                    },
-                )
-                3 -> DebtsScreen(
-                    data = data,
-                    onAddDebt = vm::addDebt,
-                    onDeleteDebt = { debt ->
-                        vm.deleteDebt(debt.id)
-                        undoable("\"${debt.name}\" qarzi o'chirildi") { vm.restoreDebt(debt) }
-                    },
-                    onPay = vm::addPayment,
-                    onDeletePayment = { debtId, payment ->
-                        vm.deletePayment(debtId, payment.id)
-                        undoable("To'lov o'chirildi") { vm.restorePayment(debtId, payment) }
-                    },
-                )
-                else -> BackupScreen(
-                    data = data,
-                    onBackedUp = vm::markBackup,
-                    onRestore = vm::replaceData,
-                    notify = notify,
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.primary,
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
                 )
             }
+        }
+            }
+            SnackbarHost(
+                snackbar,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navHeight),
+            )
         }
     }
 }

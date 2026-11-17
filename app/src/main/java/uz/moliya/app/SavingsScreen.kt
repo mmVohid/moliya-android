@@ -91,7 +91,7 @@ fun GoalsScreen(
     var entryFor by remember { mutableStateOf<Pair<Long, Boolean>?>(null) }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp + LocalBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -113,6 +113,7 @@ fun GoalsScreen(
         } else {
             items(data.goals, key = { it.id }) { goal ->
                 GoalCard(
+                    modifier = Modifier.animateItem(),
                     goal = goal,
                     expanded = expandedId == goal.id,
                     onToggle = { expandedId = if (expandedId == goal.id) null else goal.id },
@@ -148,6 +149,7 @@ fun GoalsScreen(
 
 @Composable
 private fun GoalCard(
+    modifier: Modifier = Modifier,
     goal: Goal,
     expanded: Boolean,
     onToggle: () -> Unit,
@@ -166,7 +168,7 @@ private fun GoalCard(
     }
     val perMonth = if (!done && goal.deadline > now) goal.remaining / Dates.monthsLeft(goal.deadline) else 0L
 
-    AppCard(onClick = onToggle) {
+    AppCard(modifier = modifier, onClick = onToggle) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(

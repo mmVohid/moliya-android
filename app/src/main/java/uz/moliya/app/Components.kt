@@ -2,6 +2,16 @@
 
 package uz.moliya.app
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -119,9 +129,18 @@ fun AppCard(
     val colors = CardDefaults.cardColors(containerColor = containerColor)
     val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     if (onClick != null) {
+        val source = remember { MutableInteractionSource() }
+        val pressed by source.collectIsPressedAsState()
+        val scale by animateFloatAsState(if (pressed) 0.98f else 1f, label = "press")
         Card(
             onClick = onClick,
-            modifier = modifier.fillMaxWidth(),
+            interactionSource = source,
+            modifier = modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
             shape = shape,
             colors = colors,
             border = border,
@@ -150,8 +169,12 @@ fun BigButton(
     container: Color = MaterialTheme.colorScheme.primary,
     content: Color = MaterialTheme.colorScheme.onPrimary,
 ) {
+    val haptic = LocalHapticFeedback.current
     Button(
-        onClick = onClick,
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         modifier = modifier.heightIn(min = 56.dp),
         enabled = enabled,
         shape = RoundedCornerShape(16.dp),
@@ -189,7 +212,14 @@ fun OutlineBigButton(
 }
 
 @Composable
-fun EmptyState(icon: ImageVector, title: String, text: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    icon: ImageVector,
+    title: String,
+    text: String,
+    modifier: Modifier = Modifier,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -214,6 +244,10 @@ fun EmptyState(icon: ImageVector, title: String, text: String, modifier: Modifie
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        if (actionText != null && onAction != null) {
+            Spacer(Modifier.height(16.dp))
+            BigButton(text = actionText, onClick = onAction)
+        }
     }
 }
 
@@ -312,11 +346,14 @@ fun MoneyField(
     modifier: Modifier = Modifier,
     isError: Boolean = false,
     errorText: String? = null,
+    focusRequester: FocusRequester? = null,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = { raw -> onChange(raw.filter { ch -> ch in '0'..'9' }.take(13)) },
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
         label = { Text(label) },
         singleLine = true,
         suffix = { Text("so'm") },
@@ -380,7 +417,12 @@ fun DateField(millis: Long, onChange: (Long) -> Unit, label: String = "Sana") {
 }
 
 @Composable
-fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun FormSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    footer: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -390,19 +432,31 @@ fun FormSheet(title: String, onDismiss: () -> Unit, content: @Composable ColumnS
         Column(
             Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
                 .navigationBarsPadding()
                 .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            content()
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = if (footer == null) 24.dp else 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                content()
+            }
+            if (footer != null) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                ) { footer() }
+            }
         }
     }
 }
@@ -531,4 +585,25 @@ fun StatusPill(text: String, color: Color, modifier: Modifier = Modifier) {
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+
+/** Pastki menyu balandligi: ro'yxatlar menyu ostida qolib ketmasligi uchun qo'shimcha joy. */
+val LocalBottomInset = androidx.compose.runtime.compositionLocalOf { 0.dp }
+
+/** Raqam o'zgarganda silliq sanaladi. */
+@Composable
+fun animatedLong(target: Long): Long {
+    var from by remember { mutableStateOf(target) }
+    var to by remember { mutableStateOf(target) }
+    val progress = remember { Animatable(1f) }
+    LaunchedEffect(target) {
+        if (target != to) {
+            from += ((to - from).toDouble() * progress.value).toLong()
+            to = target
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(600))
+        }
+    }
+    return from + ((to - from).toDouble() * progress.value).toLong()
 }

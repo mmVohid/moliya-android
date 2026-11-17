@@ -2,6 +2,10 @@
 
 package uz.moliya.app
 
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.PhotoCamera
@@ -114,7 +118,7 @@ fun CashFlowScreen(
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 112.dp + LocalBottomInset.current),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -169,12 +173,18 @@ fun CashFlowScreen(
                     EmptyState(
                         icon = Icons.Rounded.SwapVert,
                         title = "Yozuvlar yo'q",
-                        text = "Pastdagi \"Qo'shish\" tugmasi orqali birinchi daromad yoki xarajatni kiriting.",
+                        text = "Birinchi daromad yoki xarajatni kiriting, qolganini ilova hisoblaydi.",
+                        actionText = "Birinchi yozuvni qo'shish",
+                        onAction = {
+                            addAsIncome = false
+                            showAdd = true
+                        },
                     )
                 }
             } else {
                 items(shown, key = { it.id }) { txn ->
                     TxnRow(
+                        modifier = Modifier.animateItem(),
                         txn = txn,
                         onEdit = { editing = txn },
                         onDelete = { onDelete(txn) },
@@ -190,7 +200,7 @@ fun CashFlowScreen(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 20.dp + LocalBottomInset.current),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
             icon = { Icon(Icons.Rounded.Add, contentDescription = null) },
@@ -251,7 +261,7 @@ private fun SummaryTile(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            formatMoney(value),
+            formatMoney(animatedLong(value)),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = color,
@@ -262,7 +272,8 @@ private fun SummaryTile(
 }
 
 @Composable
-private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit, modifier: Modifier = Modifier) {
+    val haptic = LocalHapticFeedback.current
     val color = Brand.categoryColor(txn.category)
     val foreign = txn.currency != "UZS"
     val details = buildString {
@@ -270,7 +281,7 @@ private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit) {
         if (foreign) append(" · ").append(formatForeign(txn.foreignAmount, txn.currency))
         if (txn.note.isNotBlank()) append(" · ").append(txn.note)
     }
-    AppCard(padding = 12.dp, onClick = onEdit) {
+    AppCard(modifier = modifier, padding = 12.dp, onClick = onEdit) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             LetterBadge(txn.category, color)
             Spacer(Modifier.width(12.dp))
@@ -297,7 +308,13 @@ private fun TxnRow(txn: Txn, onEdit: () -> Unit, onDelete: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 color = if (txn.isIncome) Brand.income else Brand.expense,
             )
-            IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onDelete()
+                },
+                modifier = Modifier.size(48.dp),
+            ) {
                 Icon(
                     Icons.Rounded.Delete,
                     contentDescription = "O'chirish",
@@ -370,7 +387,56 @@ private fun TxnSheet(
     val canSave = amountUzs > 0 && category.isNotEmpty()
     val templates = data.templates.filter { it.isIncome == isIncome }
 
-    FormSheet(title = if (initial == null) "Yangi yozuv" else "Yozuvni tahrirlash", onDismiss = onDismiss) {
+    val saveButton: @Composable () -> Unit = {
+        BigButton(
+            text = "Saqlash",
+            enabled = canSave,
+            modifier = Modifier.fillMaxWidth(),
+            onClick = {
+                onSave(
+                    Txn(
+                        id = initial?.id ?: Ids.next(),
+                        isIncome = isIncome,
+                        amount = amountUzs,
+                        category = category,
+                        note = note.trim(),
+                        date = date,
+                        walletId = walletId,
+                        receipt = receipt,
+                    ),
+                )
+                if (initial == null && saveAsTemplate) {
+                    onAddTemplate(
+                        Template(
+                            id = Ids.next(),
+                            isIncome = isIncome,
+                            amount = amountUzs,
+                            category = category,
+                            note = note.trim(),
+                        ),
+                    )
+                }
+                onDismiss()
+            },
+        )
+    }
+    val amountFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        if (initial == null) {
+            delay(350)
+            try {
+                amountFocus.requestFocus()
+            } catch (e: IllegalStateException) {
+                // maydon hali tayyor emas
+            }
+        }
+    }
+
+    FormSheet(
+        title = if (initial == null) "Yangi yozuv" else "Yozuvni tahrirlash",
+        onDismiss = onDismiss,
+        footer = saveButton,
+    ) {
         SegmentedToggle(
             options = listOf("Xarajat", "Daromad"),
             selected = if (isIncome) 1 else 0,
@@ -426,7 +492,7 @@ private fun TxnSheet(
         }
 
         // 1. Summa
-        MoneyField(value = amount, onChange = { amount = it }, label = "Summa")
+        MoneyField(value = amount, onChange = { amount = it }, label = "Summa", focusRequester = amountFocus)
 
         // 2. Izoh (ixtiyoriy)
         NoteField(value = note, onChange = { note = it })
@@ -569,37 +635,5 @@ private fun TxnSheet(
             }
         }
 
-        // 7. Saqlash
-        BigButton(
-            text = "Saqlash",
-            enabled = canSave,
-            modifier = Modifier.fillMaxWidth(),
-            onClick = {
-                onSave(
-                    Txn(
-                        id = initial?.id ?: Ids.next(),
-                        isIncome = isIncome,
-                        amount = amountUzs,
-                        category = category,
-                        note = note.trim(),
-                        date = date,
-                        walletId = walletId,
-                        receipt = receipt,
-                    ),
-                )
-                if (initial == null && saveAsTemplate) {
-                    onAddTemplate(
-                        Template(
-                            id = Ids.next(),
-                            isIncome = isIncome,
-                            amount = amountUzs,
-                            category = category,
-                            note = note.trim(),
-                        ),
-                    )
-                }
-                onDismiss()
-            },
-        )
     }
 }

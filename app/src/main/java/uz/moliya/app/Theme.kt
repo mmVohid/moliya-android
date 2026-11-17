@@ -1,5 +1,11 @@
 package uz.moliya.app
 
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.Typography
+import android.os.Build
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -119,10 +125,40 @@ private val AppShapes = Shapes(
     extraLarge = RoundedCornerShape(28.dp),
 )
 
+private val BaseType = Typography()
+private fun TextStyle.tnum() = copy(fontFeatureSettings = "tnum")
+
+/** Raqamlar bir xil kenglikda chiqadi: ustunlar tekis turadi. */
+val MoliyaTypography = Typography(
+    displayLarge = BaseType.displayLarge.tnum(),
+    displayMedium = BaseType.displayMedium.tnum(),
+    displaySmall = BaseType.displaySmall.tnum(),
+    headlineLarge = BaseType.headlineLarge.tnum(),
+    headlineMedium = BaseType.headlineMedium.tnum(),
+    headlineSmall = BaseType.headlineSmall.tnum(),
+    titleLarge = BaseType.titleLarge.tnum(),
+    titleMedium = BaseType.titleMedium.tnum(),
+    titleSmall = BaseType.titleSmall.tnum(),
+    bodyLarge = BaseType.bodyLarge.tnum(),
+    bodyMedium = BaseType.bodyMedium.tnum(),
+    bodySmall = BaseType.bodySmall.tnum(),
+    labelLarge = BaseType.labelLarge.tnum(),
+    labelMedium = BaseType.labelMedium.tnum(),
+    labelSmall = BaseType.labelSmall.tnum(),
+)
+
 @Composable
-fun MoliyaTheme(dark: Boolean, content: @Composable () -> Unit) {
+fun MoliyaTheme(dark: Boolean, dynamic: Boolean = false, content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val scheme = when {
+        dynamic && Build.VERSION.SDK_INT >= 31 ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> DarkColors
+        else -> LightColors
+    }
     MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
+        colorScheme = scheme,
+        typography = MoliyaTypography,
         shapes = AppShapes,
     ) {
         CompositionLocalProvider(
