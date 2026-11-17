@@ -150,6 +150,7 @@ class MainActivity : FragmentActivity() {
         when (intent?.getStringExtra(EXTRA_QUICK)) {
             "expense" -> vm.requestQuickAdd(false)
             "income" -> vm.requestQuickAdd(true)
+            "debt" -> vm.requestQuickDebt()
         }
         intent?.removeExtra(EXTRA_QUICK)
     }
@@ -217,6 +218,16 @@ fun MoliyaApp(vm: FinanceViewModel) {
             snackbar.currentSnackbarData?.dismiss()
             val result = snackbar.showSnackbar(message = message, actionLabel = label, duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) action()
+        }
+    }
+
+    LaunchedEffect(vm.quickDebt) {
+        if (vm.quickDebt) {
+            tab = 3
+            showSettings = false
+            showReport = false
+            showNet = false
+            showYear = false
         }
     }
 
@@ -356,6 +367,8 @@ fun MoliyaApp(vm: FinanceViewModel) {
                     )
                     3 -> DebtsScreen(
                         data = data,
+                        quickAdd = vm.quickDebt,
+                        onQuickAddConsumed = vm::consumeQuickDebt,
                         onAddDebt = vm::addDebt,
                         onDeleteDebt = { debt ->
                             vm.deleteDebt(debt.id)

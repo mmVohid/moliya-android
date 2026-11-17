@@ -188,7 +188,8 @@ internal fun AboutPage(onBack: () -> Unit) {
                         "3. \"Oylik limit\" tugmasi bilan bir oyda jami qancha sarflashni belgilang.\n\n" +
                         "4. Qarzlar bo'limida olgan va bergan qarzlaringizni, muddatlarini kuzating.\n\n" +
                         "5. Jamg'armada himoya yostig'i va shaxsiy maqsadlar bor.\n\n" +
-                        "6. Backup bo'limidan Excel oling. Sozlamalarda avto-zaxira va parol bilan himoya yoqiladi.",
+                        "6. Backup bo'limidan Excel oling. Sozlamalarda avto-zaxira va parol bilan himoya yoqiladi.\n\n" +
+                        "7. Tezkor panel: telefonning tepa panelini tortib, qalamcha (tahrirlash) belgisini bosing va Daromad, Xarajat, Qarz plitkalarini qo'shing.",
                 )
             },
             confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Tushunarli") } },

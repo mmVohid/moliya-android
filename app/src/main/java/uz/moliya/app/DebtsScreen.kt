@@ -1,5 +1,6 @@
 package uz.moliya.app
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -56,12 +57,20 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun DebtsScreen(
     data: FinanceData,
+    quickAdd: Boolean,
+    onQuickAddConsumed: () -> Unit,
     onAddDebt: (Debt) -> Unit,
     onDeleteDebt: (Debt) -> Unit,
     onPay: (Long, DebtPayment) -> Unit,
     onDeletePayment: (Long, DebtPayment) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
+    LaunchedEffect(quickAdd) {
+        if (quickAdd) {
+            showAdd = true
+            onQuickAddConsumed()
+        }
+    }
     var showStrategy by remember { mutableStateOf(false) }
     var payFor by remember { mutableStateOf<Long?>(null) }
     var deleteTarget by remember { mutableStateOf<Debt?>(null) }

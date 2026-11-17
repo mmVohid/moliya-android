@@ -48,6 +48,39 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quick_widget_info" />
         </receiver>
+
+        <service
+            android:name=".IncomeTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_income"
+            android:label="Daromad"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".ExpenseTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_expense"
+            android:label="Xarajat"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".DebtTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_debt"
+            android:label="Qarz"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

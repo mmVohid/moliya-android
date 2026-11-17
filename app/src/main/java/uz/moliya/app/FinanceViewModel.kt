@@ -139,6 +139,17 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         quickAdd = 0
     }
 
+    var quickDebt by mutableStateOf(false)
+        private set
+
+    fun requestQuickDebt() {
+        quickDebt = true
+    }
+
+    fun consumeQuickDebt() {
+        quickDebt = false
+    }
+
     // ───── Limitlar ─────
     fun setLimits(limits: Map<String, Long>) = update { it.copy(limits = limits.filterValues { v -> v > 0L }) }
 
