@@ -1,0 +1,356 @@
+package uz.moliya.app
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.rounded.CreditCard
+import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+@Composable
+fun HomeScreen(data: FinanceData, onOpenTab: (Int) -> Unit) {
+    val start = Dates.monthStart(0)
+    val end = Dates.monthStart(1)
+    val income = data.income(start, end)
+    val expense = data.expense(start, end)
+    val balance = income - expense
+
+    val offsets = (-5..0).toList()
+    val incomes = offsets.map { data.income(Dates.monthStart(it), Dates.monthStart(it + 1)) }
+    val expenses = offsets.map { data.expense(Dates.monthStart(it), Dates.monthStart(it + 1)) }
+    val labels = offsets.map { Dates.shortMonth(it) }
+
+    val byCategory = data.txns
+        .filter { !it.isIncome && it.date >= start && it.date < end }
+        .groupBy { it.category }
+        .map { entry -> entry.key to entry.value.sumOf { t -> t.amount } }
+        .sortedByDescending { pair -> pair.second }
+
+    val monthMs = 30L * 24 * 60 * 60 * 1000
+    val staleBackup = !data.isEmpty &&
+        (data.lastBackup == 0L || System.currentTimeMillis() - data.lastBackup > monthMs)
+
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        item { ScreenHeader("Moliya", Dates.monthLabel(0)) }
+
+        item { HeroCard(balance = balance, income = income, expense = expense) }
+
+        if (staleBackup) {
+            item {
+                AppCard(
+                    onClick = { onOpenTab(4) },
+                    containerColor = Color(0xFFFFF7ED),
+                    padding = 16.dp,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Rounded.Warning,
+                            contentDescription = null,
+                            tint = Brand.warning,
+                            modifier = Modifier.size(28.dp),
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Zaxira nusxa kerak",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Brand.warning,
+                            )
+                            Text(
+                                if (data.lastBackup == 0L) "Hali Excelga yuklab olmagansiz. Backup bo'limiga o'ting."
+                                else "Oxirgi zaxira: ${Dates.format(data.lastBackup)}. Yangilab qo'ying.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Brand.ink,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            AppCard {
+                Text(
+                    "Oxirgi 6 oy",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LegendDot("Daromad", Brand.income)
+                    LegendDot("Xarajat", Brand.expense)
+                }
+                Spacer(Modifier.height(16.dp))
+                DualBarChart(incomes, expenses, labels)
+            }
+        }
+
+        item {
+            AppCard {
+                Text(
+                    "Bu oy xarajatlari",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.height(12.dp))
+                if (byCategory.isEmpty()) {
+                    Text(
+                        "Bu oy hali xarajat kiritilmagan.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    byCategory.take(5).forEachIndexed { index, pair ->
+                        if (index > 0) Spacer(Modifier.height(14.dp))
+                        CategoryBar(
+                            name = pair.first,
+                            amount = pair.second,
+                            share = if (expense > 0) pair.second.toFloat() / expense.toFloat() else 0f,
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                CushionMini(data, Modifier.weight(1f)) { onOpenTab(2) }
+                DebtMini(data, Modifier.weight(1f)) { onOpenTab(3) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroCard(balance: Long, income: Long, expense: Long) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(listOf(Brand.primary, Brand.primaryDark)))
+            .padding(24.dp),
+    ) {
+        Column {
+            Text(
+                "Oy balansi",
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White.copy(alpha = 0.85f),
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                formatMoney(balance),
+                fontSize = 32.sp,
+                lineHeight = 40.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HeroStat("Daromad", income, Modifier.weight(1f))
+                HeroStat("Xarajat", expense, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HeroStat(label: String, value: Long, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White.copy(alpha = 0.16f))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.85f))
+        Spacer(Modifier.height(2.dp))
+        Text(
+            formatMoney(value),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun LegendDot(text: String, color: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(color),
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DualBarChart(income: List<Long>, expense: List<Long>, labels: List<String>) {
+    val maxValue = maxOf(1L, income.maxOrNull() ?: 0L, expense.maxOrNull() ?: 0L)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(170.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        labels.forEachIndexed { i, label ->
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.Bottom,
+                ) {
+                    Bar(income[i], maxValue, Brand.income)
+                    Bar(expense[i], maxValue, Brand.expense)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.Bar(value: Long, maxValue: Long, color: Color) {
+    if (value <= 0L) {
+        Box(
+            Modifier
+                .width(10.dp)
+                .height(3.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Brand.track),
+        )
+    } else {
+        val fraction = (value.toFloat() / maxValue.toFloat()).coerceIn(0.03f, 1f)
+        Box(
+            Modifier
+                .width(10.dp)
+                .fillMaxHeight(fraction)
+                .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
+                .background(color),
+        )
+    }
+}
+
+@Composable
+private fun CategoryBar(name: String, amount: Long, share: Float) {
+    val color = Brand.categoryColor(name)
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                name,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            Text(
+                formatMoney(amount),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        ProgressBar(progress = share, color = color)
+    }
+}
+
+@Composable
+private fun CushionMini(data: FinanceData, modifier: Modifier, onClick: () -> Unit) {
+    val target = data.cushionTarget
+    val progress = if (target > 0) (data.cushionSaved.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f
+    AppCard(modifier = modifier, onClick = onClick, padding = 16.dp) {
+        Icon(Icons.Rounded.Savings, contentDescription = null, tint = Brand.primary, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("Himoya yostig'i", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            if (target > 0) "${(progress * 100).toInt()}%" else "—",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        Spacer(Modifier.height(8.dp))
+        ProgressBar(progress = progress, color = Brand.primary)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (target > 0) "maqsadga" else "Reja belgilanmagan",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DebtMini(data: FinanceData, modifier: Modifier, onClick: () -> Unit) {
+    val active = data.debts.count { it.remaining > 0 }
+    AppCard(modifier = modifier, onClick = onClick, padding = 16.dp) {
+        Icon(Icons.Rounded.CreditCard, contentDescription = null, tint = Brand.expense, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(10.dp))
+        Text("Qarz qoldig'i", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            formatMoney(data.debtRemaining),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (active == 0) "Faol qarz yo'q" else "$active ta faol qarz",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
