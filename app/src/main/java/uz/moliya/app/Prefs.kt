@@ -24,7 +24,6 @@ data class AppSettings(
     val onboarded: Boolean = false,
     /** Android 12+: ilova rangi fon rasmiga moslashadi */
     val dynamicColor: Boolean = false,
-    val userName: String = "",
     val encryptData: Boolean = false,
     val backupEncrypted: Boolean = false,
     val backupPwd: String = "",
@@ -35,11 +34,7 @@ data class AppSettings(
     val dailyReminder: Boolean = false,
     val dailyHour: Int = 21,
     val dailyMinute: Int = 0,
-    /** 0 oddiy, 1 katta, 2 juda katta */
-    val textScale: Int = 0,
     val compactNumbers: Boolean = false,
-    /** Bosh sahifa kartalari: 1 grafik, 2 kategoriyalar, 4 jamg'arma darajasi, 8 jamg'arma/qarz, 16 tahlil */
-    val homeCards: Int = 31,
     /** Hisob oyi boshlanish kuni (1..28) */
     val monthStartDay: Int = 1,
     val backupKeep: Int = 4,
@@ -68,7 +63,6 @@ object Prefs {
             secureScreen = sp.getBoolean("secureScreen", false),
             onboarded = sp.getBoolean("onboarded", false),
             dynamicColor = sp.getBoolean("dynamicColor", false),
-            userName = sp.getString("userName", "") ?: "",
             encryptData = sp.getBoolean("encryptData", false),
             backupEncrypted = sp.getBoolean("backupEncrypted", false),
             backupPwd = sp.getString("backupPwd", "") ?: "",
@@ -78,9 +72,7 @@ object Prefs {
             dailyReminder = sp.getBoolean("dailyReminder", false),
             dailyHour = sp.getInt("dailyHour", 21),
             dailyMinute = sp.getInt("dailyMinute", 0),
-            textScale = sp.getInt("textScale", 0),
             compactNumbers = sp.getBoolean("compactNumbers", false),
-            homeCards = sp.getInt("homeCards", 31),
             monthStartDay = sp.getInt("monthStartDay", 1),
             backupKeep = sp.getInt("backupKeep", 4),
             backupWeekday = sp.getInt("backupWeekday", 0),
@@ -101,7 +93,6 @@ object Prefs {
             .putBoolean("secureScreen", s.secureScreen)
             .putBoolean("onboarded", s.onboarded)
             .putBoolean("dynamicColor", s.dynamicColor)
-            .putString("userName", s.userName)
             .putBoolean("encryptData", s.encryptData)
             .putBoolean("backupEncrypted", s.backupEncrypted)
             .putString("backupPwd", s.backupPwd)
@@ -111,9 +102,7 @@ object Prefs {
             .putBoolean("dailyReminder", s.dailyReminder)
             .putInt("dailyHour", s.dailyHour)
             .putInt("dailyMinute", s.dailyMinute)
-            .putInt("textScale", s.textScale)
             .putBoolean("compactNumbers", s.compactNumbers)
-            .putInt("homeCards", s.homeCards)
             .putInt("monthStartDay", s.monthStartDay)
             .putInt("backupKeep", s.backupKeep)
             .putInt("backupWeekday", s.backupWeekday)

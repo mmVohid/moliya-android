@@ -27,7 +27,7 @@ class DailyHabitWorker(context: Context, params: WorkerParameters) : Worker(cont
         if (!settings.dailyReminder) return Result.success()
         val start = Dates.noon(System.currentTimeMillis()) - 12L * 60 * 60 * 1000
         val wroteToday = Storage.load(ctx).txns.any { it.date in start until start + 24L * 60 * 60 * 1000 }
-        if (!wroteToday) DailyHabit.notify(ctx, settings.userName)
+        if (!wroteToday) DailyHabit.notify(ctx)
         return Result.success()
     }
 }
@@ -57,7 +57,7 @@ object DailyHabit {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
-    fun notify(context: Context, name: String) {
+    fun notify(context: Context) {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -71,7 +71,7 @@ object DailyHabit {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             .putExtra(MainActivity.EXTRA_QUICK, "expense")
         val pending = PendingIntent.getActivity(context, 20, open, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val title = if (name.isBlank()) "Bugungi xarajatlarni yozdingizmi?" else "$name, bugungi xarajatlarni yozdingizmi?"
+        val title = "Bugungi xarajatlarni yozdingizmi?"
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_wallet)
             .setContentTitle(title)

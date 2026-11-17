@@ -92,13 +92,6 @@ class MainActivity : FragmentActivity() {
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 onDispose { }
             }
-            val baseDensity = LocalDensity.current
-            val factor = when (settings.textScale) {
-                1 -> 1.15f
-                2 -> 1.3f
-                else -> 1f
-            }
-            CompositionLocalProvider(LocalDensity provides Density(baseDensity.density, baseDensity.fontScale * factor)) {
             MoliyaTheme(dark = dark, dynamic = settings.dynamicColor) {
                 if (vm.locked) {
                     LockScreen(
@@ -121,7 +114,6 @@ class MainActivity : FragmentActivity() {
                 } else {
                     MoliyaApp(vm)
                 }
-            }
             }
         }
     }
@@ -294,8 +286,6 @@ fun MoliyaApp(vm: FinanceViewModel) {
                         onToggleHide = { vm.setHideBalance(!data.hideBalance) },
                         onOpenSettings = { showSettings = true },
                         lastBackupAt = vm.lastBackupAt,
-                    userName = vm.settings.userName,
-                    cards = 31,
                     backupReminder = vm.settings.backupReminder,
                         autoBackupOn = vm.settings.autoBackup && vm.settings.backupFolder.isNotEmpty(),
                         firstEntryAt = vm.settings.firstEntryAt,

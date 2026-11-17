@@ -65,8 +65,6 @@ fun HomeScreen(
     onToggleHide: () -> Unit,
     onOpenSettings: () -> Unit,
     lastBackupAt: Long,
-    userName: String,
-    cards: Int,
     backupReminder: Boolean,
     autoBackupOn: Boolean,
     firstEntryAt: Long,
@@ -177,10 +175,10 @@ fun HomeScreen(
         }
 
         run {
-        if (cards and 4 != 0) item { SectionTitle("Bu oy") }
-        if (cards and 4 != 0) item { SavingsRateCard(data = data, onClick = onOpenReport) }
-        if (cards and 1 != 0) item { SectionTitle("Oxirgi 12 oy") }
-        if (cards and 1 != 0) item {
+        item { SectionTitle("Bu oy") }
+        item { SavingsRateCard(data = data, onClick = onOpenReport) }
+        item { SectionTitle("Oxirgi 12 oy") }
+        item {
             AppCard {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     LegendDot("Daromad", Brand.income)
@@ -201,8 +199,8 @@ fun HomeScreen(
             }
         }
 
-        if (cards and 8 != 0) item { SectionTitle("Jamg'arma va qarzlar") }
-        if (cards and 8 != 0) item {
+        item { SectionTitle("Jamg'arma va qarzlar") }
+        item {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -213,8 +211,8 @@ fun HomeScreen(
                 DebtMini(data, Modifier.weight(1f).fillMaxHeight()) { onOpenTab(3) }
             }
         }
-        if (cards and 16 != 0) item { SectionTitle("Tahlil") }
-        if (cards and 16 != 0) item {
+        item { SectionTitle("Tahlil") }
+        item {
             AppCard(padding = 4.dp) {
                 NavRow(Icons.Rounded.Assessment, "Oylik hisobot", "Tejash, byudjet va xulosalar", onOpenReport)
                 NavRow(Icons.Rounded.AccountBalance, "Sof boylik", "Hamyonlar, jamg'arma va qarzlar", onOpenNetWorth)
@@ -411,44 +409,6 @@ private fun RowScope.Bar(value: Long, maxValue: Long, color: Color) {
 }
 
 @Composable
-private fun CategoryBar(name: String, amount: Long, share: Float, limit: Long) {
-    val base = Brand.categoryColor(name)
-    val ratio = if (limit > 0L) amount.toFloat() / limit.toFloat() else 0f
-    val barColor = when {
-        limit <= 0L -> base
-        ratio > 1f -> Brand.expense
-        ratio >= 0.8f -> Brand.warning
-        else -> base
-    }
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                name,
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-            )
-            Text(
-                formatMoney(amount),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        ProgressBar(progress = if (limit > 0L) ratio else share, color = barColor)
-        if (limit > 0L) {
-            Spacer(Modifier.height(4.dp))
-            Text(
-                if (ratio > 1f) "Limit oshdi: ${formatMoney(amount - limit)} ortiqcha (limit ${formatMoney(limit)})"
-                else "Limitning ${(ratio * 100).toInt()}% ishlatildi (limit ${formatMoney(limit)})",
-                style = MaterialTheme.typography.bodySmall,
-                color = if (ratio >= 0.8f) barColor else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 private fun CushionMini(data: FinanceData, modifier: Modifier, onClick: () -> Unit) {
     val target = data.cushionTarget
     val progress = if (target > 0) (data.cushionSaved.toFloat() / target.toFloat()).coerceIn(0f, 1f) else 0f
@@ -554,23 +514,6 @@ fun savingsColor(rate: Float?): Color = when {
     else -> Brand.expense
 }
 
-
-@Composable
-private fun WelcomeStep(number: String, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(number, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = Brand.primary)
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-    }
-}
 
 @Composable
 private fun NavRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) {

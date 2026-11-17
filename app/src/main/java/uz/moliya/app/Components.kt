@@ -292,23 +292,6 @@ fun SegmentedToggle(
 }
 
 @Composable
-fun CategoryChips(categories: List<String>, selected: String, onSelect: (String) -> Unit) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        categories.forEach { name ->
-            FilterChip(
-                selected = name == selected,
-                onClick = { onSelect(name) },
-                label = { Text(name, style = MaterialTheme.typography.labelLarge) },
-                modifier = Modifier.heightIn(min = 40.dp),
-            )
-        }
-    }
-}
-
-@Composable
 fun MonthSwitcher(
     label: String,
     onPrev: () -> Unit,

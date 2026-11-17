@@ -84,48 +84,6 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun addTransfer(t: Transfer) = update { it.copy(transfers = it.transfers + t) }
     fun deleteTransfer(id: Long) = update { d -> d.copy(transfers = d.transfers.filterNot { it.id == id }) }
 
-    private fun FinanceData.cats(income: Boolean) = if (income) incomeCategories else expenseCategories
-
-    private fun FinanceData.withCats(income: Boolean, list: List<String>) =
-        if (income) copy(incomeList = list) else copy(expenseList = list)
-
-    fun addCategory(income: Boolean, name: String) = update { d ->
-        val n = name.trim()
-        val list = d.cats(income)
-        if (n.isEmpty() || list.any { it.equals(n, true) }) d else d.withCats(income, list + n)
-    }
-
-    fun renameCategory(income: Boolean, old: String, new: String) = update { d ->
-        val n = new.trim()
-        val list = d.cats(income)
-        if (n.isEmpty() || n == old || list.any { it.equals(n, true) }) {
-            d
-        } else {
-            val renamed = d.withCats(income, list.map { if (it == old) n else it })
-            renamed.copy(
-                txns = d.txns.map { if (it.isIncome == income && it.category == old) it.copy(category = n) else it },
-                templates = d.templates.map { if (it.isIncome == income && it.category == old) it.copy(category = n) else it },
-                limits = if (income) d.limits else d.limits.mapKeys { (k, _) -> if (k == old) n else k },
-            )
-        }
-    }
-
-    fun deleteCategory(income: Boolean, name: String) = update { d ->
-        val list = d.cats(income)
-        if (list.size <= 1) d
-        else d.withCats(income, list - name).copy(limits = if (income) d.limits else d.limits - name)
-    }
-
-    fun moveCategory(income: Boolean, name: String, delta: Int) = update { d ->
-        val list = d.cats(income).toMutableList()
-        val i = list.indexOf(name)
-        val k = i + delta
-        if (i < 0 || k !in list.indices) d else {
-            list[i] = list[k].also { list[k] = list[i] }
-            d.withCats(income, list)
-        }
-    }
-
     fun setEncryption(on: Boolean) {
         updateSettings(settings.copy(encryptData = on))
         Storage.save(getApplication<Application>(), data)
@@ -139,12 +97,9 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         else updateSettings(settings.copy(backupEncrypted = true, backupPwd = BackupCrypto.sealPassword(password)))
     }
 
-    fun setUserName(name: String) = updateSettings(settings.copy(userName = name.trim().take(24)))
     fun setLockDelay(sec: Int) = updateSettings(settings.copy(lockDelaySec = sec))
     fun setBackupReminder(on: Boolean) = updateSettings(settings.copy(backupReminder = on))
-    fun setTextScale(i: Int) = updateSettings(settings.copy(textScale = i))
     fun setCompactNumbers(on: Boolean) = updateSettings(settings.copy(compactNumbers = on))
-    fun setHomeCards(mask: Int) = updateSettings(settings.copy(homeCards = mask))
     fun setMonthStartDay(d: Int) = updateSettings(settings.copy(monthStartDay = d.coerceIn(1, 28)))
 
     fun setDaily(on: Boolean, hour: Int, minute: Int) {
