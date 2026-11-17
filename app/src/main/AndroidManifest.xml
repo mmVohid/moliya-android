@@ -81,6 +81,39 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".SavingTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_saving"
+            android:label="Jamg'arma"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".ReportTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_report"
+            android:label="Hisobot"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".BackupTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_backup"
+            android:label="Zaxira"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

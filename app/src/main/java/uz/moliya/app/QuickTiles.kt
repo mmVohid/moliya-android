@@ -38,3 +38,6 @@ abstract class BaseQuickTile(private val kind: String) : TileService() {
 class IncomeTile : BaseQuickTile("income")
 class ExpenseTile : BaseQuickTile("expense")
 class DebtTile : BaseQuickTile("debt")
+class SavingTile : BaseQuickTile("saving")
+class ReportTile : BaseQuickTile("report")
+class BackupTile : BaseQuickTile("backup")

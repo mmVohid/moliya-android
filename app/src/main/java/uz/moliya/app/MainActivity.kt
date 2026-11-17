@@ -151,6 +151,7 @@ class MainActivity : FragmentActivity() {
             "expense" -> vm.requestQuickAdd(false)
             "income" -> vm.requestQuickAdd(true)
             "debt" -> vm.requestQuickDebt()
+            "saving", "report", "backup" -> vm.requestNav(intent.getStringExtra(EXTRA_QUICK) ?: "")
         }
         intent?.removeExtra(EXTRA_QUICK)
     }
@@ -218,6 +219,22 @@ fun MoliyaApp(vm: FinanceViewModel) {
             snackbar.currentSnackbarData?.dismiss()
             val result = snackbar.showSnackbar(message = message, actionLabel = label, duration = SnackbarDuration.Long)
             if (result == SnackbarResult.ActionPerformed) action()
+        }
+    }
+
+    LaunchedEffect(vm.navRequest) {
+        val target = vm.navRequest
+        if (target.isNotEmpty()) {
+            showSettings = false
+            showNet = false
+            showYear = false
+            showReport = false
+            when (target) {
+                "saving" -> tab = 2
+                "backup" -> tab = 4
+                "report" -> showReport = true
+            }
+            vm.consumeNav()
         }
     }
 

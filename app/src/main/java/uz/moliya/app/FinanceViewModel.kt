@@ -139,6 +139,18 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         quickAdd = 0
     }
 
+    /** Plitkalardan keladigan yo'naltirish: saving, report, backup */
+    var navRequest by mutableStateOf("")
+        private set
+
+    fun requestNav(target: String) {
+        navRequest = target
+    }
+
+    fun consumeNav() {
+        navRequest = ""
+    }
+
     var quickDebt by mutableStateOf(false)
         private set
 
