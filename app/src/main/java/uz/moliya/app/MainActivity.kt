@@ -1,5 +1,6 @@
 package uz.moliya.app
 
+import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import android.os.SystemClock
@@ -15,7 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.material.icons.rounded.Savings
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,11 +24,14 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,6 +53,8 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (vm.settings.reminders) Reminders.schedule(applicationContext)
+        if (vm.settings.autoBackup) AutoBackup.schedule(applicationContext)
+        handleIntent(intent)
         setContent {
             val settings = vm.settings
             val dark = when (settings.theme) {
@@ -77,11 +83,30 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        when (intent?.getStringExtra(EXTRA_QUICK)) {
+            "expense" -> vm.requestQuickAdd(false)
+            "income" -> vm.requestQuickAdd(true)
+        }
+        intent?.removeExtra(EXTRA_QUICK)
+    }
+
     override fun onStart() {
         super.onStart()
+        vm.refreshSettings()
         // Fonda 15 soniyadan ortiq turgan bo'lsa, qayta qulflaymiz
         if (stoppedAt != 0L && SystemClock.elapsedRealtime() - stoppedAt > 15_000L) vm.lock()
         vm.applyRecurring()
+    }
+
+    companion object {
+        const val EXTRA_QUICK = "quick"
     }
 
     override fun onStop() {
@@ -95,7 +120,7 @@ private data class TabItem(val label: String, val icon: ImageVector)
 private val tabs = listOf(
     TabItem("Bosh", Icons.Rounded.Home),
     TabItem("Pul oqimi", Icons.Rounded.SwapVert),
-    TabItem("Yostiq", Icons.Rounded.Shield),
+    TabItem("Jamg'arma", Icons.Rounded.Savings),
     TabItem("Qarzlar", Icons.Rounded.CreditCard),
     TabItem("Backup", Icons.Rounded.Backup),
 )
@@ -104,30 +129,64 @@ private val tabs = listOf(
 fun MoliyaApp(vm: FinanceViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showReport by rememberSaveable { mutableStateOf(false) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val data = vm.data
 
-    val notify: (String) -> Unit = { message -> scope.launch { snackbar.showSnackbar(message) } }
+    val notify: (String) -> Unit = { message ->
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(message)
+        }
+    }
+    val undoable: (String, () -> Unit) -> Unit = { message, restore ->
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar(
+                message = message,
+                actionLabel = "Qaytarish",
+                duration = SnackbarDuration.Long,
+            )
+            if (result == SnackbarResult.ActionPerformed) restore()
+        }
+    }
 
-    BackHandler(enabled = showSettings) { showSettings = false }
+    LaunchedEffect(vm.quickAdd) {
+        if (vm.quickAdd != 0) {
+            tab = 1
+            showSettings = false
+            showReport = false
+        }
+    }
 
-    if (showSettings) {
+    BackHandler(enabled = showSettings || showReport) {
+        showSettings = false
+        showReport = false
+    }
+
+    if (showSettings || showReport) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbar) },
         ) { padding ->
             Box(Modifier.padding(padding)) {
-                SettingsScreen(
-                    settings = vm.settings,
-                    verifyPin = vm::verifyPin,
-                    onSetPin = vm::setPin,
-                    onClearPin = vm::clearPin,
-                    onBiometric = vm::setBiometric,
-                    onTheme = vm::setTheme,
-                    onReminders = vm::setReminders,
-                    onBack = { showSettings = false },
-                )
+                if (showSettings) {
+                    SettingsScreen(
+                        settings = vm.settings,
+                        verifyPin = vm::verifyPin,
+                        onSetPin = vm::setPin,
+                        onClearPin = vm::clearPin,
+                        onBiometric = vm::setBiometric,
+                        onTheme = vm::setTheme,
+                        onReminders = vm::setReminders,
+                        onAutoBackup = vm::setAutoBackup,
+                        onPickFolder = vm::setBackupFolder,
+                        onBack = { showSettings = false },
+                    )
+                } else {
+                    ReportScreen(data = data, onBack = { showReport = false })
+                }
             }
         }
         return
@@ -169,31 +228,63 @@ fun MoliyaApp(vm: FinanceViewModel) {
                     onOpenTab = { tab = it },
                     onToggleHide = { vm.setHideBalance(!data.hideBalance) },
                     onOpenSettings = { showSettings = true },
+                    lastBackupAt = vm.lastBackupAt,
+                    onQuickAdd = { income ->
+                        vm.requestQuickAdd(income)
+                    },
+                    onOpenReport = { showReport = true },
                 )
                 1 -> CashFlowScreen(
                     data = data,
+                    quickAdd = vm.quickAdd,
+                    onQuickAddConsumed = vm::consumeQuickAdd,
                     onAdd = { txn ->
                         val before = data
                         vm.addTxn(txn)
                         warnIfOverLimit(before, txn, notify)
                     },
-                    onDelete = vm::deleteTxn,
+                    onUpdate = vm::updateTxn,
+                    onDelete = { txn ->
+                        vm.deleteTxn(txn.id)
+                        undoable("Yozuv o'chirildi") { vm.restoreTxn(txn) }
+                    },
                     onAddRecurring = vm::addRecurring,
                     onDeleteRecurring = vm::deleteRecurring,
                     onSaveLimits = vm::setLimits,
+                    onAddTemplate = vm::addTemplate,
+                    onDeleteTemplate = vm::deleteTemplate,
                 )
-                2 -> CushionScreen(
+                2 -> SavingsHost(
                     data = data,
                     onPlan = vm::setPlan,
-                    onAdd = vm::addCushion,
-                    onDelete = vm::deleteCushion,
+                    onAddCushion = vm::addCushion,
+                    onDeleteCushion = { e ->
+                        vm.deleteCushion(e.id)
+                        undoable("Yozuv o'chirildi") { vm.restoreCushion(e) }
+                    },
+                    onAddGoal = vm::addGoal,
+                    onDeleteGoal = { g ->
+                        vm.deleteGoal(g.id)
+                        undoable("\"${g.name}\" o'chirildi") { vm.restoreGoal(g) }
+                    },
+                    onAddGoalEntry = vm::addGoalEntry,
+                    onDeleteGoalEntry = { goalId, e ->
+                        vm.deleteGoalEntry(goalId, e.id)
+                        undoable("Yozuv o'chirildi") { vm.restoreGoalEntry(goalId, e) }
+                    },
                 )
                 3 -> DebtsScreen(
                     data = data,
                     onAddDebt = vm::addDebt,
-                    onDeleteDebt = vm::deleteDebt,
+                    onDeleteDebt = { debt ->
+                        vm.deleteDebt(debt.id)
+                        undoable("\"${debt.name}\" qarzi o'chirildi") { vm.restoreDebt(debt) }
+                    },
                     onPay = vm::addPayment,
-                    onDeletePayment = vm::deletePayment,
+                    onDeletePayment = { debtId, payment ->
+                        vm.deletePayment(debtId, payment.id)
+                        undoable("To'lov o'chirildi") { vm.restorePayment(debtId, payment) }
+                    },
                 )
                 else -> BackupScreen(
                     data = data,

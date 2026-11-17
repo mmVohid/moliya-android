@@ -51,9 +51,9 @@ import androidx.compose.ui.unit.dp
 fun DebtsScreen(
     data: FinanceData,
     onAddDebt: (Debt) -> Unit,
-    onDeleteDebt: (Long) -> Unit,
+    onDeleteDebt: (Debt) -> Unit,
     onPay: (Long, DebtPayment) -> Unit,
-    onDeletePayment: (Long, Long) -> Unit,
+    onDeletePayment: (Long, DebtPayment) -> Unit,
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var payFor by remember { mutableStateOf<Long?>(null) }
@@ -144,7 +144,7 @@ fun DebtsScreen(
                         onToggle = { expandedId = if (expandedId == debt.id) null else debt.id },
                         onPay = { payFor = debt.id },
                         onDelete = { deleteTarget = debt },
-                        onDeletePayment = { paymentId -> onDeletePayment(debt.id, paymentId) },
+                        onDeletePayment = { payment -> onDeletePayment(debt.id, payment) },
                     )
                 }
             }
@@ -187,7 +187,7 @@ fun DebtsScreen(
             text = "\"${del.name}\" va uning barcha to'lov tarixi o'chiriladi. Davom etasizmi?",
             confirmLabel = "O'chirish",
             onConfirm = {
-                onDeleteDebt(del.id)
+                onDeleteDebt(del)
                 deleteTarget = null
             },
             onDismiss = { deleteTarget = null },
@@ -222,7 +222,7 @@ private fun DebtCard(
     onToggle: () -> Unit,
     onPay: () -> Unit,
     onDelete: () -> Unit,
-    onDeletePayment: (Long) -> Unit,
+    onDeletePayment: (DebtPayment) -> Unit,
 ) {
     val closed = debt.remaining == 0L
     val overdue = !closed && debt.dueDate > 0L && debt.dueDate < System.currentTimeMillis()
@@ -341,7 +341,7 @@ private fun DebtCard(
                             fontWeight = FontWeight.SemiBold,
                             color = Brand.income,
                         )
-                        IconButton(onClick = { onDeletePayment(payment.id) }, modifier = Modifier.size(44.dp)) {
+                        IconButton(onClick = { onDeletePayment(payment) }, modifier = Modifier.size(44.dp)) {
                             Icon(
                                 Icons.Rounded.Delete,
                                 contentDescription = "Yozuvni o'chirish",

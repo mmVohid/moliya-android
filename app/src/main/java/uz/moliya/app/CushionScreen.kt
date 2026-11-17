@@ -48,11 +48,10 @@ fun CushionScreen(
     data: FinanceData,
     onPlan: (Long, Int) -> Unit,
     onAdd: (CushionEntry) -> Unit,
-    onDelete: (Long) -> Unit,
+    onDelete: (CushionEntry) -> Unit,
 ) {
     var showPlan by remember { mutableStateOf(false) }
     var entryMode by remember { mutableStateOf<Boolean?>(null) } // true = qo'shish, false = yechish
-    var toDelete by remember { mutableStateOf<CushionEntry?>(null) }
 
     val saved = data.cushionSaved
     val target = data.cushionTarget
@@ -84,8 +83,6 @@ fun CushionScreen(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { ScreenHeader("Himoya yostig'i", "Favqulodda holatlar uchun pul zaxirasi") }
-
         item {
             AppCard {
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -205,7 +202,7 @@ fun CushionScreen(
                 }
             } else {
                 items(history, key = { it.id }) { entry ->
-                    EntryRow(entry = entry, onDelete = { toDelete = entry })
+                    EntryRow(entry = entry, onDelete = { onDelete(entry) })
                 }
             }
         }
@@ -223,31 +220,20 @@ fun CushionScreen(
 
     val mode = entryMode
     if (mode != null) {
-        EntrySheet(
+        AmountEntrySheet(
             deposit = mode,
-            saved = saved,
+            available = saved,
+            titleAdd = "Yostiqqa qo'shish",
+            titleTake = "Yostiqdan yechish",
+            availableLabel = "Yostiqdagi mablag'",
             onDismiss = { entryMode = null },
             onSave = onAdd,
-        )
-    }
-
-    val target2 = toDelete
-    if (target2 != null) {
-        ConfirmDialog(
-            title = "Yozuvni o'chirish",
-            text = "${formatMoney(Math.abs(target2.amount))} miqdoridagi yozuv o'chiriladi. Davom etasizmi?",
-            confirmLabel = "O'chirish",
-            onConfirm = {
-                onDelete(target2.id)
-                toDelete = null
-            },
-            onDismiss = { toDelete = null },
         )
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
+internal fun InfoRow(label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             label,
@@ -264,7 +250,7 @@ private fun InfoRow(label: String, value: String) {
 }
 
 @Composable
-private fun EntryRow(entry: CushionEntry, onDelete: () -> Unit) {
+internal fun EntryRow(entry: CushionEntry, onDelete: () -> Unit) {
     val deposit = entry.amount >= 0
     val color = if (deposit) Brand.income else Brand.expense
     AppCard(padding = 12.dp) {
@@ -388,9 +374,12 @@ private fun PlanSheet(
 }
 
 @Composable
-private fun EntrySheet(
+internal fun AmountEntrySheet(
     deposit: Boolean,
-    saved: Long,
+    available: Long,
+    titleAdd: String,
+    titleTake: String,
+    availableLabel: String,
     onDismiss: () -> Unit,
     onSave: (CushionEntry) -> Unit,
 ) {
@@ -398,15 +387,15 @@ private fun EntrySheet(
     var note by remember { mutableStateOf("") }
     var date by remember { mutableStateOf(Dates.today()) }
     val value = parseMoney(amount)
-    val tooMuch = !deposit && value > saved
+    val tooMuch = !deposit && value > available
 
     FormSheet(
-        title = if (deposit) "Yostiqqa qo'shish" else "Yostiqdan yechish",
+        title = if (deposit) titleAdd else titleTake,
         onDismiss = onDismiss,
     ) {
         if (!deposit) {
             Text(
-                "Yostiqdagi mablag': ${formatMoney(saved)}",
+                "$availableLabel: ${formatMoney(available)}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -416,7 +405,7 @@ private fun EntrySheet(
             onChange = { amount = it },
             label = "Summa",
             isError = tooMuch,
-            errorText = "Yostiqdagi mablag'dan ko'p bo'lmasligi kerak",
+            errorText = "Mavjud mablag'dan ko'p bo'lmasligi kerak",
         )
         NoteField(value = note, onChange = { note = it })
         DateField(millis = date, onChange = { date = it })

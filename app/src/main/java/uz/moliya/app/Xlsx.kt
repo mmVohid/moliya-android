@@ -28,6 +28,9 @@ object XlsxExporter {
             paymentSheet(data),
             limitSheet(data),
             recurringSheet(data),
+            templateSheet(data),
+            goalSheet(data),
+            goalEntrySheet(data),
         )
         ZipOutputStream(BufferedOutputStream(out)).use { zip ->
             zip.entry("[Content_Types].xml", contentTypes(sheets.size))
@@ -62,6 +65,7 @@ object XlsxExporter {
             listOf("Himoya yostig'i: maqsad muddati (oy)", d.targetMonths),
             listOf("Himoya yostig'i: maqsad summasi", d.cushionTarget),
             listOf("", ""),
+            listOf("Jamg'arma maqsadlari soni", d.goals.size),
             listOf("Faol qarzlar soni", d.debts.count { it.remaining > 0 }),
             listOf("Olingan qarzlar qoldig'i (men qarzdorman)", d.debtOwed),
             listOf("Berilgan qarzlar qoldig'i (menga qarzdor)", d.debtLent),
@@ -82,8 +86,11 @@ object XlsxExporter {
     }
 
     private fun txnSheet(d: FinanceData): Sheet {
-        val rows = mutableListOf<List<Any>>(listOf("Sana", "Turi", "Kategoriya", "Summa (so'm)", "Izoh"))
+        val rows = mutableListOf<List<Any>>(
+            listOf("Sana", "Turi", "Kategoriya", "Summa (so'm)", "Izoh", "Valyuta", "Valyuta summasi", "Kurs"),
+        )
         for (t in d.txns.sortedWith(compareBy<Txn> { it.date }.thenBy { it.id })) {
+            val foreign = t.currency != "UZS"
             rows.add(
                 listOf(
                     Dates.iso(t.date),
@@ -91,10 +98,13 @@ object XlsxExporter {
                     t.category,
                     t.amount,
                     t.note,
+                    t.currency,
+                    if (foreign) t.foreignAmount else "",
+                    if (foreign) t.rate else "",
                 ),
             )
         }
-        return Sheet("Daromad-Xarajat", listOf(14, 12, 22, 18, 40), rows)
+        return Sheet("Daromad-Xarajat", listOf(14, 12, 22, 18, 40, 10, 18, 12), rows)
     }
 
     private fun cushionSheet(d: FinanceData): Sheet {
@@ -172,6 +182,40 @@ object XlsxExporter {
             )
         }
         return Sheet("Takroriy", listOf(12, 22, 18, 30, 8, 16), rows)
+    }
+
+    private fun templateSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Turi", "Kategoriya", "Summa (so'm)", "Izoh"))
+        for (t in d.templates) {
+            rows.add(listOf(if (t.isIncome) "Daromad" else "Xarajat", t.category, t.amount, t.note))
+        }
+        return Sheet("Shablonlar", listOf(12, 22, 18, 30), rows)
+    }
+
+    private fun goalSheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Nomi", "Maqsad summasi", "Jamg'arilgan", "Muddat"))
+        for (g in d.goals) {
+            rows.add(listOf(g.name, g.target, g.saved, if (g.deadline > 0L) Dates.iso(g.deadline) else ""))
+        }
+        return Sheet("Maqsadlar", listOf(26, 18, 18, 14), rows)
+    }
+
+    private fun goalEntrySheet(d: FinanceData): Sheet {
+        val rows = mutableListOf<List<Any>>(listOf("Maqsad", "Sana", "Amal", "Summa (so'm)", "Izoh"))
+        for (g in d.goals) {
+            for (e in g.entries.sortedBy { it.date }) {
+                rows.add(
+                    listOf(
+                        g.name,
+                        Dates.iso(e.date),
+                        if (e.amount >= 0) "Qo'shildi" else "Yechildi",
+                        Math.abs(e.amount),
+                        e.note,
+                    ),
+                )
+            }
+        }
+        return Sheet("Maqsad yozuvlari", listOf(26, 14, 14, 18, 30), rows)
     }
 
     // ───── XML ─────

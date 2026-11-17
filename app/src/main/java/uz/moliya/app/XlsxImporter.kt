@@ -18,6 +18,7 @@ object XlsxImporter {
 
     private val KNOWN_SHEETS = setOf(
         "Daromad-Xarajat", "Himoya yostigi", "Qarzlar", "Qarz tolovlari", "Limitlar", "Takroriy", "Xulosa",
+        "Shablonlar", "Maqsadlar", "Maqsad yozuvlari",
     )
 
     fun read(input: InputStream): FinanceData {
@@ -70,6 +71,9 @@ object XlsxImporter {
                     category = r.col(2).ifEmpty { "Boshqa" },
                     note = r.col(4),
                     date = date(r.col(0)),
+                    currency = r.col(5).ifEmpty { "UZS" },
+                    foreignAmount = r.col(6).replace(',', '.').toDoubleOrNull() ?: 0.0,
+                    rate = r.col(7).replace(',', '.').toDoubleOrNull() ?: 0.0,
                 )
             }
         }
@@ -153,6 +157,53 @@ object XlsxImporter {
             }
         }
 
+        val templates = sheets["Shablonlar"].dataRows().mapNotNull { r ->
+            val amount = num(r.col(2))
+            if (amount <= 0L) {
+                null
+            } else {
+                Template(
+                    id = Ids.next(),
+                    isIncome = r.col(0).equals("Daromad", ignoreCase = true),
+                    amount = amount,
+                    category = r.col(1).ifEmpty { "Boshqa" },
+                    note = r.col(3),
+                )
+            }
+        }
+
+        val goals = ArrayList<Goal>()
+        for (r in sheets["Maqsadlar"].dataRows()) {
+            val name = r.col(0)
+            val target = num(r.col(1))
+            if (name.isEmpty() || target <= 0L) continue
+            val deadlineText = r.col(3)
+            goals.add(
+                Goal(
+                    id = Ids.next(),
+                    name = name,
+                    target = target,
+                    deadline = if (deadlineText.isEmpty()) 0L else date(deadlineText),
+                    entries = emptyList(),
+                ),
+            )
+        }
+        for (r in sheets["Maqsad yozuvlari"].dataRows()) {
+            val index = goals.indexOfFirst { it.name == r.col(0) }
+            val amount = num(r.col(3))
+            if (index < 0 || amount <= 0L) continue
+            val withdraw = r.col(2).startsWith("Yech", ignoreCase = true)
+            val goal = goals[index]
+            goals[index] = goal.copy(
+                entries = goal.entries + CushionEntry(
+                    id = Ids.next(),
+                    amount = if (withdraw) -amount else amount,
+                    note = r.col(4),
+                    date = date(r.col(1)),
+                ),
+            )
+        }
+
         return FinanceData(
             txns = txns,
             cushion = cushion,
@@ -161,6 +212,8 @@ object XlsxImporter {
             debts = debts,
             limits = limits,
             recurring = recurring,
+            templates = templates,
+            goals = goals,
         )
     }
 

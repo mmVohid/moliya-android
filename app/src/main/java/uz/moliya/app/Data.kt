@@ -18,6 +18,11 @@ data class Txn(
     val category: String,
     val note: String,
     val date: Long,
+    /** "UZS" yoki chet el valyutasi; amount har doim so'mdagi qiymat */
+    val currency: String = "UZS",
+    val foreignAmount: Double = 0.0,
+    /** 1 birlik valyuta necha so'm (yozuv paytidagi kurs) */
+    val rate: Double = 0.0,
 )
 
 /** amount > 0: yostiqqa qo'shildi, amount < 0: yostiqdan yechildi */
@@ -51,6 +56,35 @@ data class Debt(
         get() = if (total <= 0L) 0f else (paid.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }
 
+/** Tez-tez takrorlanadigan xarajat/daromad shabloni */
+data class Template(
+    val id: Long,
+    val isIncome: Boolean,
+    val amount: Long,
+    val category: String,
+    val note: String,
+)
+
+/** Jamg'arma maqsadi (telefon, safar va h.k.). entries: musbat = qo'shildi, manfiy = yechildi */
+data class Goal(
+    val id: Long,
+    val name: String,
+    val target: Long,
+    /** 0 = muddat yo'q */
+    val deadline: Long,
+    val entries: List<CushionEntry>,
+) {
+    val saved: Long get() = entries.sumOf { it.amount }.coerceAtLeast(0L)
+    val remaining: Long get() = (target - saved).coerceAtLeast(0L)
+    val progress: Float
+        get() = if (target <= 0L) 0f else (saved.toFloat() / target.toFloat()).coerceIn(0f, 1f)
+}
+
+object Currencies {
+    val foreign = listOf("USD", "EUR", "RUB")
+    val all = listOf("UZS") + foreign
+}
+
 /** Har oy takrorlanadigan yozuv (oylik maosh, ijara, kredit to'lovi va h.k.) */
 data class Recurring(
     val id: Long,
@@ -75,6 +109,8 @@ data class FinanceData(
     /** Kategoriya -> oylik xarajat limiti (so'm) */
     val limits: Map<String, Long> = emptyMap(),
     val recurring: List<Recurring> = emptyList(),
+    val templates: List<Template> = emptyList(),
+    val goals: List<Goal> = emptyList(),
 ) {
     val cushionSaved: Long get() = cushion.sumOf { it.amount }.coerceAtLeast(0L)
     val cushionTarget: Long get() = monthlyNeed * targetMonths
@@ -84,13 +120,20 @@ data class FinanceData(
 
     /** Menga qarzdor (berilgan qarzlar qoldig'i) */
     val debtLent: Long get() = debts.filter { it.isLent }.sumOf { it.remaining }
-    val isEmpty: Boolean get() = txns.isEmpty() && cushion.isEmpty() && debts.isEmpty()
+    val isEmpty: Boolean get() = txns.isEmpty() && cushion.isEmpty() && debts.isEmpty() && goals.isEmpty()
 
     fun income(start: Long, end: Long): Long =
         txns.filter { it.isIncome && it.date >= start && it.date < end }.sumOf { it.amount }
 
     fun expense(start: Long, end: Long): Long =
         txns.filter { !it.isIncome && it.date >= start && it.date < end }.sumOf { it.amount }
+
+    /** Oy uchun jamg'arma darajasi: (daromad - xarajat) / daromad; daromad yo'q bo'lsa null */
+    fun savingsRate(start: Long, end: Long): Float? {
+        val inc = income(start, end)
+        if (inc <= 0L) return null
+        return (inc - expense(start, end)).toFloat() / inc.toFloat()
+    }
 
     fun categorySpent(category: String, start: Long, end: Long): Long =
         txns.filter { !it.isIncome && it.category == category && it.date >= start && it.date < end }
@@ -155,6 +198,11 @@ fun formatMoney(value: Long): String {
         sb.append(digits[i])
     }
     return (if (negative) "−" else "") + sb.toString() + " so'm"
+}
+
+fun formatForeign(value: Double, currency: String): String {
+    val s = if (value % 1.0 == 0.0) String.format(Locale.US, "%,.0f", value) else String.format(Locale.US, "%,.2f", value)
+    return "$s $currency"
 }
 
 fun parseMoney(text: String): Long = text.filter { it in '0'..'9' }.toLongOrNull() ?: 0L
@@ -234,6 +282,12 @@ object Dates {
             Locale.US, " %02d:%02d",
             c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE),
         )
+    }
+
+    /** Bugundan muddatgacha taxminan nechta oy qolgan (kamida 1) */
+    fun monthsLeft(deadline: Long): Int {
+        val days = (deadline - today()).toDouble() / 86_400_000.0
+        return Math.max(1, Math.ceil(days / 30.0).toInt())
     }
 
     fun dayOfMonth(millis: Long): Int = cal(millis).get(Calendar.DAY_OF_MONTH)
@@ -336,6 +390,39 @@ object Storage {
         }
         root.put("recurring", recurring)
 
+        val templates = JSONArray()
+        for (t in d.templates) {
+            val o = JSONObject()
+            o.put("id", t.id)
+            o.put("income", t.isIncome)
+            o.put("amount", t.amount)
+            o.put("category", t.category)
+            o.put("note", t.note)
+            templates.put(o)
+        }
+        root.put("templates", templates)
+
+        val goals = JSONArray()
+        for (g in d.goals) {
+            val o = JSONObject()
+            o.put("id", g.id)
+            o.put("name", g.name)
+            o.put("target", g.target)
+            o.put("deadline", g.deadline)
+            val entries = JSONArray()
+            for (e in g.entries) {
+                val eo = JSONObject()
+                eo.put("id", e.id)
+                eo.put("amount", e.amount)
+                eo.put("note", e.note)
+                eo.put("date", e.date)
+                entries.put(eo)
+            }
+            o.put("entries", entries)
+            goals.put(o)
+        }
+        root.put("goals", goals)
+
         val txns = JSONArray()
         for (t in d.txns) {
             val o = JSONObject()
@@ -345,6 +432,11 @@ object Storage {
             o.put("category", t.category)
             o.put("note", t.note)
             o.put("date", t.date)
+            if (t.currency != "UZS") {
+                o.put("cur", t.currency)
+                o.put("fa", t.foreignAmount)
+                o.put("rate", t.rate)
+            }
             txns.put(o)
         }
         root.put("txns", txns)
@@ -400,6 +492,9 @@ object Storage {
                 category = it.optString("category", "Boshqa"),
                 note = it.optString("note", ""),
                 date = it.getLong("date"),
+                currency = it.optString("cur", "UZS"),
+                foreignAmount = it.optDouble("fa", 0.0),
+                rate = it.optDouble("rate", 0.0),
             )
         },
         cushion = o.optJSONArray("cushion").mapObjects {
@@ -431,6 +526,31 @@ object Storage {
         },
         lastBackup = o.optLong("lastBackup", 0L),
         hideBalance = o.optBoolean("hideBalance", false),
+        templates = o.optJSONArray("templates").mapObjects {
+            Template(
+                id = it.getLong("id"),
+                isIncome = it.getBoolean("income"),
+                amount = it.getLong("amount"),
+                category = it.optString("category", "Boshqa"),
+                note = it.optString("note", ""),
+            )
+        },
+        goals = o.optJSONArray("goals").mapObjects { g ->
+            Goal(
+                id = g.getLong("id"),
+                name = g.optString("name", ""),
+                target = g.getLong("target"),
+                deadline = g.optLong("deadline", 0L),
+                entries = g.optJSONArray("entries").mapObjects { e ->
+                    CushionEntry(
+                        id = e.getLong("id"),
+                        amount = e.getLong("amount"),
+                        note = e.optString("note", ""),
+                        date = e.getLong("date"),
+                    )
+                },
+            )
+        },
         limits = parseLimits(o.optJSONObject("limits")),
         recurring = o.optJSONArray("recurring").mapObjects {
             Recurring(

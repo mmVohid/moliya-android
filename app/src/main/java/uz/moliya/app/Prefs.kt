@@ -14,6 +14,10 @@ data class AppSettings(
     /** 0 = tizim, 1 = yorug', 2 = qorong'i */
     val theme: Int = 0,
     val reminders: Boolean = false,
+    /** Haftalik avtomatik Excel zaxira */
+    val autoBackup: Boolean = false,
+    val backupFolder: String = "",
+    val lastAutoBackup: Long = 0L,
 ) {
     val hasPin: Boolean get() = pinHash.isNotEmpty()
 }
@@ -29,6 +33,9 @@ object Prefs {
             biometric = sp.getBoolean("biometric", false),
             theme = sp.getInt("theme", 0),
             reminders = sp.getBoolean("reminders", false),
+            autoBackup = sp.getBoolean("autoBackup", false),
+            backupFolder = sp.getString("backupFolder", "") ?: "",
+            lastAutoBackup = sp.getLong("lastAutoBackup", 0L),
         )
     }
 
@@ -39,8 +46,17 @@ object Prefs {
             .putBoolean("biometric", s.biometric)
             .putInt("theme", s.theme)
             .putBoolean("reminders", s.reminders)
+            .putBoolean("autoBackup", s.autoBackup)
+            .putString("backupFolder", s.backupFolder)
+            .putLong("lastAutoBackup", s.lastAutoBackup)
             .apply()
     }
+}
+
+/** Worker faqat shu maydonni yangilaydi (sozlamalarning qolgan qismiga tegmaydi). */
+fun Prefs.setLastAutoBackup(context: Context, millis: Long) {
+    context.getSharedPreferences("moliya_prefs", Context.MODE_PRIVATE).edit()
+        .putLong("lastAutoBackup", millis).apply()
 }
 
 object Pin {

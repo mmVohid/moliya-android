@@ -14,6 +14,10 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     var settings by mutableStateOf(Prefs.load(app))
         private set
 
+    /** Tez qo'shish so'rovi: 0 = yo'q, 1 = xarajat, 2 = daromad (widget, ikonka menyusi, Bosh sahifa tugmasi) */
+    var quickAdd by mutableStateOf(0)
+        private set
+
     /** PIN o'rnatilgan bo'lsa, ilova qulflangan holda ochiladi. */
     var locked by mutableStateOf(settings.hasPin)
         private set
@@ -26,6 +30,7 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
         val next = block(data)
         data = next
         Storage.save(getApplication<Application>(), next)
+        QuickWidget.refresh(getApplication<Application>())
     }
 
     private fun updateSettings(next: AppSettings) {
@@ -36,6 +41,21 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     // ───── Daromad / Xarajat ─────
     fun addTxn(t: Txn) = update { it.copy(txns = it.txns + t) }
     fun deleteTxn(id: Long) = update { d -> d.copy(txns = d.txns.filterNot { it.id == id }) }
+    fun updateTxn(t: Txn) = update { d -> d.copy(txns = d.txns.map { if (it.id == t.id) t else it }) }
+    fun restoreTxn(t: Txn) = update { d -> if (d.txns.any { it.id == t.id }) d else d.copy(txns = d.txns + t) }
+
+    // ───── Shablonlar ─────
+    fun addTemplate(t: Template) = update { it.copy(templates = it.templates + t) }
+    fun deleteTemplate(id: Long) = update { d -> d.copy(templates = d.templates.filterNot { it.id == id }) }
+
+    // ───── Tez qo'shish ─────
+    fun requestQuickAdd(income: Boolean) {
+        quickAdd = if (income) 2 else 1
+    }
+
+    fun consumeQuickAdd() {
+        quickAdd = 0
+    }
 
     // ───── Takroriy yozuvlar ─────
     fun addRecurring(r: Recurring) {
@@ -63,10 +83,46 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addCushion(e: CushionEntry) = update { it.copy(cushion = it.cushion + e) }
     fun deleteCushion(id: Long) = update { d -> d.copy(cushion = d.cushion.filterNot { it.id == id }) }
+    fun restoreCushion(e: CushionEntry) =
+        update { d -> if (d.cushion.any { it.id == e.id }) d else d.copy(cushion = d.cushion + e) }
+
+    // ───── Maqsadlar ─────
+    fun addGoal(g: Goal) = update { it.copy(goals = it.goals + g) }
+    fun deleteGoal(id: Long) = update { d -> d.copy(goals = d.goals.filterNot { it.id == id }) }
+    fun restoreGoal(g: Goal) = update { d -> if (d.goals.any { it.id == g.id }) d else d.copy(goals = d.goals + g) }
+
+    fun addGoalEntry(goalId: Long, e: CushionEntry) = update { d ->
+        d.copy(goals = d.goals.map { if (it.id == goalId) it.copy(entries = it.entries + e) else it })
+    }
+
+    fun deleteGoalEntry(goalId: Long, entryId: Long) = update { d ->
+        d.copy(
+            goals = d.goals.map { g ->
+                if (g.id == goalId) g.copy(entries = g.entries.filterNot { it.id == entryId }) else g
+            },
+        )
+    }
+
+    fun restoreGoalEntry(goalId: Long, e: CushionEntry) = update { d ->
+        d.copy(
+            goals = d.goals.map { g ->
+                if (g.id == goalId && g.entries.none { it.id == e.id }) g.copy(entries = g.entries + e) else g
+            },
+        )
+    }
 
     // ───── Qarzlar ─────
     fun addDebt(debt: Debt) = update { it.copy(debts = it.debts + debt) }
     fun deleteDebt(id: Long) = update { d -> d.copy(debts = d.debts.filterNot { it.id == id }) }
+    fun restoreDebt(debt: Debt) = update { d -> if (d.debts.any { it.id == debt.id }) d else d.copy(debts = d.debts + debt) }
+
+    fun restorePayment(debtId: Long, p: DebtPayment) = update { d ->
+        d.copy(
+            debts = d.debts.map { debt ->
+                if (debt.id == debtId && debt.payments.none { it.id == p.id }) debt.copy(payments = debt.payments + p) else debt
+            },
+        )
+    }
 
     fun addPayment(debtId: Long, p: DebtPayment) = update { d ->
         d.copy(debts = d.debts.map { if (it.id == debtId) it.copy(payments = it.payments + p) else it })
@@ -96,6 +152,8 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
             debts = imported.debts,
             limits = imported.limits,
             recurring = imported.recurring,
+            templates = imported.templates,
+            goals = imported.goals,
         ) }
 
     // ───── Sozlamalar, qulf ─────
@@ -122,6 +180,21 @@ class FinanceViewModel(app: Application) : AndroidViewModel(app) {
     fun setBiometric(on: Boolean) = updateSettings(settings.copy(biometric = on && settings.hasPin))
 
     fun setTheme(mode: Int) = updateSettings(settings.copy(theme = mode))
+
+    /** Fonda ishlagan avto-zaxira (worker) yangilagan sozlamalarni qayta o'qiydi. */
+    fun refreshSettings() {
+        settings = Prefs.load(getApplication<Application>())
+    }
+
+    /** Oxirgi zaxira vaqti: qo'lda yoki avtomatik, qaysi biri yangi bo'lsa */
+    val lastBackupAt: Long get() = maxOf(data.lastBackup, settings.lastAutoBackup)
+
+    fun setBackupFolder(uri: String) = updateSettings(settings.copy(backupFolder = uri))
+
+    fun setAutoBackup(on: Boolean) {
+        updateSettings(settings.copy(autoBackup = on))
+        if (on) AutoBackup.schedule(getApplication<Application>()) else AutoBackup.cancel(getApplication<Application>())
+    }
 
     fun setReminders(on: Boolean) {
         updateSettings(settings.copy(reminders = on))

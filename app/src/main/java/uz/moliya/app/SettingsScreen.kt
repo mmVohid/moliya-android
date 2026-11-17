@@ -1,6 +1,7 @@
 package uz.moliya.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,6 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 
+import androidx.compose.material3.TextButton
+
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -45,6 +48,8 @@ fun SettingsScreen(
     onBiometric: (Boolean) -> Unit,
     onTheme: (Int) -> Unit,
     onReminders: (Boolean) -> Unit,
+    onAutoBackup: (Boolean) -> Unit,
+    onPickFolder: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -54,6 +59,23 @@ fun SettingsScreen(
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted -> onReminders(granted) }
+
+    val folderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+                onPickFolder(uri.toString())
+                onAutoBackup(true)
+            } catch (e: SecurityException) {
+                // ruxsat olinmadi
+            }
+        }
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 32.dp),
@@ -165,6 +187,36 @@ fun SettingsScreen(
                             onReminders(true)
                         }
                     },
+                )
+            }
+        }
+
+        item { SectionTitle("Avtomatik zaxira") }
+        item {
+            AppCard {
+                SwitchRow(
+                    title = "Haftalik Excel zaxira",
+                    subtitle = if (settings.backupFolder.isEmpty()) "Papka tanlanmagan. Yoqilganda papka so'raladi."
+                    else "Har hafta tanlangan papkaga saqlanadi (oxirgi 4 ta fayl qoladi)" +
+                        if (settings.lastAutoBackup > 0L) ". Oxirgisi: ${Dates.formatDateTime(settings.lastAutoBackup)}" else "",
+                    checked = settings.autoBackup,
+                    enabled = true,
+                    onChange = { on ->
+                        if (!on) onAutoBackup(false)
+                        else if (settings.backupFolder.isEmpty()) folderLauncher.launch(null)
+                        else onAutoBackup(true)
+                    },
+                )
+                if (settings.backupFolder.isNotEmpty()) {
+                    TextButton(onClick = { folderLauncher.launch(null) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("Papkani o'zgartirish", fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Diqqat: avtomatik fayllar PIN bilan himoyalanmaydi. Papkani xavfsiz joyda tanlang.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

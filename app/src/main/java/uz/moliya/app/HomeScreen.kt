@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.material.icons.rounded.CreditCard
@@ -49,6 +51,9 @@ fun HomeScreen(
     onOpenTab: (Int) -> Unit,
     onToggleHide: () -> Unit,
     onOpenSettings: () -> Unit,
+    lastBackupAt: Long,
+    onQuickAdd: (Boolean) -> Unit,
+    onOpenReport: () -> Unit,
 ) {
     val start = Dates.monthStart(0)
     val end = Dates.monthStart(1)
@@ -69,7 +74,7 @@ fun HomeScreen(
 
     val monthMs = 30L * 24 * 60 * 60 * 1000
     val staleBackup = !data.isEmpty &&
-        (data.lastBackup == 0L || System.currentTimeMillis() - data.lastBackup > monthMs)
+        (lastBackupAt == 0L || System.currentTimeMillis() - lastBackupAt > monthMs)
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
@@ -100,6 +105,27 @@ fun HomeScreen(
             )
         }
 
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                BigButton(
+                    text = "Xarajat",
+                    icon = Icons.Rounded.Remove,
+                    container = Brand.expense,
+                    onClick = { onQuickAdd(false) },
+                    modifier = Modifier.weight(1f),
+                )
+                BigButton(
+                    text = "Daromad",
+                    icon = Icons.Rounded.Add,
+                    container = Brand.income,
+                    onClick = { onQuickAdd(true) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        item { SavingsRateCard(data = data, onClick = onOpenReport) }
+
         if (staleBackup) {
             item {
                 AppCard(
@@ -123,8 +149,8 @@ fun HomeScreen(
                                 color = Brand.warning,
                             )
                             Text(
-                                if (data.lastBackup == 0L) "Hali Excelga yuklab olmagansiz. Backup bo'limiga o'ting."
-                                else "Oxirgi zaxira: ${Dates.format(data.lastBackup)}. Yangilab qo'ying.",
+                                if (lastBackupAt == 0L) "Hali Excelga yuklab olmagansiz. Backup bo'limiga o'ting."
+                                else "Oxirgi zaxira: ${Dates.format(lastBackupAt)}. Yangilab qo'ying.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
@@ -447,4 +473,65 @@ private fun DebtMini(data: FinanceData, modifier: Modifier, onClick: () -> Unit)
             overflow = TextOverflow.Ellipsis,
         )
     }
+}
+
+
+@Composable
+private fun SavingsRateCard(data: FinanceData, onClick: () -> Unit) {
+    val rates = (-5..0).map { data.savingsRate(Dates.monthStart(it), Dates.monthStart(it + 1)) }
+    val current = rates.last()
+    val color = savingsColor(current)
+    AppCard(onClick = onClick) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Jamg'arma darajasi",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    if (current == null) "—" else formatPercent(current.toDouble() * 100.0),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = color,
+                )
+                Text(
+                    if (current == null) "Bu oy daromad kiritilmagan" else "Maqsad: 20% va undan yuqori",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                Modifier.height(56.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                rates.forEach { r ->
+                    val h = if (r == null) 4f else (r.coerceIn(0f, 0.5f) / 0.5f * 52f).coerceAtLeast(4f)
+                    Box(
+                        Modifier
+                            .width(10.dp)
+                            .height(h.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(savingsColor(r).copy(alpha = if (r == null) 0.25f else 1f)),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Batafsil hisobot →",
+            style = MaterialTheme.typography.labelLarge,
+            color = Brand.primary,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+fun savingsColor(rate: Float?): Color = when {
+    rate == null -> Brand.muted
+    rate >= 0.20f -> Brand.income
+    rate >= 0.10f -> Brand.warning
+    else -> Brand.expense
 }
