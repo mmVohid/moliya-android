@@ -103,7 +103,13 @@ class MainActivity : FragmentActivity() {
                 } else if (!settings.onboarded) {
                     SetupScreen(
                         settings = settings,
-                        onReminders = vm::setReminders,
+                        onReminders = { on ->
+                            vm.setReminders(on)
+                            if (on) {
+                                vm.setDaily(true)
+                                vm.setBackupReminder(true)
+                            }
+                        },
                         onSecureScreen = vm::setSecureScreen,
                         onSetPin = vm::setPin,
                         verifyPin = vm::verifyPin,
