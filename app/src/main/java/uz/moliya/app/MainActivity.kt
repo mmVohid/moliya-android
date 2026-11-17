@@ -17,7 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Savings
+import androidx.compose.material.icons.rounded.Paid
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -137,7 +137,7 @@ private data class TabItem(val label: String, val icon: ImageVector)
 private val tabs = listOf(
     TabItem("Bosh", Icons.Rounded.Home),
     TabItem("Pul oqimi", Icons.Rounded.SwapVert),
-    TabItem("Jamg'arma", Icons.Rounded.Savings),
+    TabItem("Jamg'arma", Icons.Rounded.Paid),
     TabItem("Qarzlar", Icons.Rounded.CreditCard),
     TabItem("Backup", Icons.Rounded.Backup),
 )

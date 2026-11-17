@@ -346,17 +346,7 @@ private fun TxnSheet(
 ) {
     val context = LocalContext.current
     var isIncome by remember { mutableStateOf(initial?.isIncome ?: startIncome) }
-    var currency by remember { mutableStateOf(initial?.currency ?: "UZS") }
-    var amount by remember {
-        mutableStateOf(
-            when {
-                initial == null -> ""
-                initial.currency == "UZS" -> initial.amount.toString()
-                else -> trimNumber(initial.foreignAmount)
-            },
-        )
-    }
-    var rate by remember { mutableStateOf(if (initial != null && initial.rate > 0.0) trimNumber(initial.rate) else "") }
+    var amount by remember { mutableStateOf(initial?.amount?.toString() ?: "") }
     var category by remember { mutableStateOf(initial?.category ?: "") }
     var note by remember { mutableStateOf(initial?.note ?: "") }
     var date by remember { mutableStateOf(initial?.date ?: Dates.today()) }
@@ -375,14 +365,9 @@ private fun TxnSheet(
     }
     var manageTemplates by remember { mutableStateOf(false) }
 
-    val foreign = currency != "UZS"
     val categories = if (isIncome) data.incomeCategories else data.expenseCategories
-    val amountUzs: Long = if (foreign) {
-        (parseDecimal(amount) * parseDecimal(rate)).roundToLong()
-    } else {
-        parseMoney(amount)
-    }
-    val canSave = amountUzs > 0 && category.isNotEmpty() && (!foreign || parseDecimal(rate) > 0.0)
+    val amountUzs: Long = parseMoney(amount)
+    val canSave = amountUzs > 0 && category.isNotEmpty()
     val templates = data.templates.filter { it.isIncome == isIncome }
 
     FormSheet(title = if (initial == null) "Yangi yozuv" else "Yozuvni tahrirlash", onDismiss = onDismiss) {
@@ -418,7 +403,6 @@ private fun TxnSheet(
                             if (manageTemplates) {
                                 onDeleteTemplate(t.id)
                             } else {
-                                currency = "UZS"
                                 amount = t.amount.toString()
                                 category = t.category
                                 note = t.note
@@ -442,53 +426,53 @@ private fun TxnSheet(
         }
 
         // 1. Summa
-        if (foreign) {
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = filterDecimal(it) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Summa ($currency)") },
-                suffix = { Text(currency) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(14.dp),
-            )
-        } else {
-            MoneyField(value = amount, onChange = { amount = it }, label = "Summa")
-        }
+        MoneyField(value = amount, onChange = { amount = it }, label = "Summa")
 
-        // 2. Valyuta turi
-        SegmentedToggle(
-            options = Currencies.all.map { if (it == "UZS") "So'm" else it },
-            selected = Currencies.all.indexOf(currency).coerceAtLeast(0),
-            onSelect = { index ->
-                val next = Currencies.all[index]
-                if (next != currency) {
-                    currency = next
-                    amount = ""
-                    rate = if (next == "UZS") "" else lastRate(data, next)
-                }
-            },
-        )
-        if (foreign) {
-            OutlinedTextField(
-                value = rate,
-                onValueChange = { rate = filterDecimal(it) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Kurs (1 $currency necha so'm)") },
-                suffix = { Text("so'm") },
-                supportingText = { if (amountUzs > 0) Text("= ${formatMoney(amountUzs)}") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(14.dp),
-            )
-        }
-
-        // 3. Izoh (ixtiyoriy)
+        // 2. Izoh (ixtiyoriy)
         NoteField(value = note, onChange = { note = it })
 
-        // 4. Sana
+        // 3. Sana
         DateField(millis = date, onChange = { date = it })
+
+        // 4. Chekni ilova qilish
+        Text(
+            "Chekni ilova qilish",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        val preview = remember(receipt) { Receipts.load(context, receipt) }
+        if (preview != null) {
+            androidx.compose.foundation.Image(
+                bitmap = preview,
+                contentDescription = "Chek rasmi",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 220.dp)
+                    .clip(RoundedCornerShape(14.dp)),
+                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlineBigButton(
+                text = "Kamera",
+                icon = Icons.Rounded.PhotoCamera,
+                onClick = {
+                    val target = Receipts.cameraTarget(context)
+                    cameraTarget = target
+                    camera.launch(target.second)
+                },
+                modifier = Modifier.weight(1f),
+            )
+            OutlineBigButton(
+                text = "Galereya",
+                icon = Icons.Rounded.Image,
+                onClick = { gallery.launch("image/*") },
+                modifier = Modifier.weight(1f),
+            )
+        }
+        if (receipt.isNotEmpty()) {
+            TextButton(onClick = { receipt = "" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Rasmni olib tashlash") }
+        }
 
         // 5. Kategoriya (ro'yxat + Yangi kategoriya)
         var menuOpen by remember { mutableStateOf(false) }
@@ -568,47 +552,7 @@ private fun TxnSheet(
             }
         }
 
-        // 6. Chek rasmi (daromadda: Ilova qilish)
-        Text(
-            if (isIncome) "Ilova qilish" else "Chek rasmi",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-        val preview = remember(receipt) { Receipts.load(context, receipt) }
-        if (preview != null) {
-            androidx.compose.foundation.Image(
-                bitmap = preview,
-                contentDescription = if (isIncome) "Ilova qilingan rasm" else "Chek rasmi",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 220.dp)
-                    .clip(RoundedCornerShape(14.dp)),
-                contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlineBigButton(
-                text = "Kamera",
-                icon = Icons.Rounded.PhotoCamera,
-                onClick = {
-                    val target = Receipts.cameraTarget(context)
-                    cameraTarget = target
-                    camera.launch(target.second)
-                },
-                modifier = Modifier.weight(1f),
-            )
-            OutlineBigButton(
-                text = "Galereya",
-                icon = Icons.Rounded.Image,
-                onClick = { gallery.launch("image/*") },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (receipt.isNotEmpty()) {
-            TextButton(onClick = { receipt = "" }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Rasmni olib tashlash") }
-        }
-
-        if (initial == null && !foreign) {
+        if (initial == null) {
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -639,14 +583,11 @@ private fun TxnSheet(
                         category = category,
                         note = note.trim(),
                         date = date,
-                        currency = currency,
-                        foreignAmount = if (foreign) parseDecimal(amount) else 0.0,
-                        rate = if (foreign) parseDecimal(rate) else 0.0,
                         walletId = walletId,
                         receipt = receipt,
                     ),
                 )
-                if (initial == null && saveAsTemplate && !foreign) {
+                if (initial == null && saveAsTemplate) {
                     onAddTemplate(
                         Template(
                             id = Ids.next(),
